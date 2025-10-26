@@ -1,6 +1,57 @@
-# Claude Code
+# Claude Code (private, not for instructor)
 .claude/
 CLAUDE.md
 
 # macOS
 .DS_Store
+
+# Research papers (PDFs only, allow markdown documentation)
+research-papers/*.pdf
+
+# Python (for ML training on Windows)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# Conda
+.conda/
+*.conda
+
+# Jupyter
+.ipynb_checkpoints/
+
+# ML Training
+training/checkpoints/
+training/runs/
+training/logs/
+*.h5
+*.pth
+*.onnx
+# Keep the final .tflite models for Flutter app
+!app/assets/models/*.tflite
+
+# Datasets (large files)
+datasets/
+*.zip
+*.tar.gz
+*.csv
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
