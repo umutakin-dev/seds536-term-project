@@ -22,13 +22,43 @@ While this is an academic project for SEDS536, the app is designed **in spirit a
 - **YES**: Approachable and welcoming design
 - **YES**: Modern, inclusive, and respectful
 
-### Design System
+### Design & Implementation Framework
 
-Using **Google Stitch Design System** for:
-- Inclusive design principles
-- Accessibility-first approach
-- Consistent, professional components
-- Diversity and representation focus
+**Two-Layer Approach**:
+
+#### 1. Design Layer: Google Stitch (AI-Powered UI Generation)
+- **Purpose**: Generate UI mockups and design inspiration
+- **Tool**: https://stitch.withgoogle.com
+- **Features**:
+  - AI-powered design generation using Gemini
+  - Rapid prototyping and iteration
+  - Export to Figma and HTML/CSS
+  - Natural language prompting
+- **Our Use**: Create initial screen designs, refine layouts, establish visual direction
+
+#### 2. Implementation Layer: shadcn_ui for Flutter
+- **Purpose**: Pre-built, customizable Flutter components
+- **Package**: `shadcn_ui` v0.38.5 ([pub.dev](https://pub.dev/packages/shadcn_ui))
+- **Documentation**: https://flutter-shadcn-ui.mariuti.com
+- **Features**:
+  - 40+ customizable components (Card, Dialog, Sheet, Input, Progress, etc.)
+  - Hybrid Material + shadcn support (critical for camera integration)
+  - Built-in theming with 12 color schemes
+  - Modern, clean aesthetic (rounded corners, soft shadows)
+  - MIT licensed, actively maintained
+- **Our Use**: Implement actual Flutter UI using pre-built, customizable components
+
+**Design-to-Implementation Flow**:
+```
+Stitch (mockups) → Identify shadcn components → Customize with Dracula/Alucard themes → Implement in Flutter
+```
+
+**Why This Combination**:
+- **Stitch**: Provides warm, friendly design direction aligned with our vision
+- **shadcn_ui**: Provides professional, customizable components for rapid implementation
+- **Synergy**: Design in Stitch, implement with shadcn, customize to match our aesthetic
+- **Inclusive design**: Both tools support accessibility and modern design patterns
+- **Flexibility**: shadcn's extreme customizability allows matching Stitch designs
 
 ### Color Themes
 
@@ -310,8 +340,19 @@ Using **Google Stitch Design System** for:
 
 ## References
 
-- Google Stitch Design System: https://stitch.withgoogle.com
+**Design Tools**:
+- Google Stitch: https://stitch.withgoogle.com
 - Stitch Prompt Guide: https://discuss.ai.google.dev/t/stitch-prompt-guide/83844
+
+**Implementation Framework**:
+- shadcn_ui Flutter Package: https://pub.dev/packages/shadcn_ui
+- shadcn_ui Documentation: https://flutter-shadcn-ui.mariuti.com
+
+**Design Themes**:
+- Dracula Theme: https://draculatheme.com
+- Alucard Theme: (Dracula's light mode counterpart)
+
+**Research**:
 - Monk Skin Tone Scale: (see research docs)
 
 ---
