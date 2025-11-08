@@ -45,5 +45,11 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>This app needs access to your camera to capture your photo for skin tone analysis.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This app needs access to your microphone for video capture.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app needs access to your photo library to save analysis results.</string>
 </dict>
 </plist>
