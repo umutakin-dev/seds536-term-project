@@ -1,6 +1,72 @@
-# Stitch Design System - Study Notes
+# Design Tools Research & Selection
 
-**Purpose**: Document key takeaways from studying Google's Stitch and how to apply it to our skin tone detection app.
+**Purpose**: Document evaluation of AI-powered design tools (Stitch vs Figma) and final tool selection for the skin tone detection app.
+
+**Date**: October 27 - November 8, 2025
+
+---
+
+## ✅ Final Decision: Figma AI
+
+**Tool Selected**: Figma AI Free Tier (https://figma.com)
+
+**Why Figma Over Stitch**:
+1. **Generates actual code** - React/TypeScript implementation, not just mockups
+2. **Complete component library** - Includes 50+ shadcn/ui components
+3. **Exact specifications** - Color codes, spacing, borders already implemented
+4. **Direct Flutter mapping** - shadcn/ui (React) → shadcn_ui (Flutter)
+5. **Time savings** - Code provides implementation reference
+
+**Limitations (Free Tier)**:
+- ⚠️ **Limited daily quota** - Reached quota after generating 5 screens + iterations
+- ⚠️ **Sufficient for MVP** - Got all core screens needed for initial implementation
+- ✅ **Code is reusable** - Can reference and adapt generated code without regenerating
+- 💡 **For future iterations** - May need paid tier or wait for quota reset
+
+### What We Generated with Figma AI
+
+**5 Complete Screens** (6,437 lines of React/TypeScript code):
+
+1. **Home.tsx** (132 lines)
+   - Welcome dashboard with "Start Analysis" CTA
+   - Tips card and navigation
+
+2. **SkinAnalysis.tsx** (409 lines)
+   - 4-step flow: Instructions → Camera → Analyzing → Results
+   - Camera with lighting quality indicator (purple-pink gradient)
+   - **Monk Skin Tone Scale (10 colors)**: #F6EDE4 → #3A2416
+   - Confidence score with circular progress ring
+   - Face guide with purple/pink corner highlights
+
+3. **Recommendations.tsx** (157 lines)
+   - Product cards with images and descriptions
+   - Filters and category tabs
+
+4. **History.tsx** (180 lines)
+   - Timeline grouped by month
+   - Swipe-to-delete hints
+   - Empty state
+   - Export functionality
+
+5. **Profile.tsx** (117 lines)
+   - User profile with achievements
+   - Settings menu items
+
+**Bonus**: Complete shadcn/ui component library (Button, Card, Dialog, Progress, Sheet, etc.)
+
+**Location**: `docs/design/figma/project/`
+
+---
+
+## 📚 Stitch Research (Historical Context)
+
+Below is our initial evaluation of Google Stitch. We studied Stitch's methodology and prompting techniques, which informed our approach with Figma. This research is preserved for academic documentation purposes.
+
+**Note**: While we ultimately chose Figma, the Stitch prompting methodology (iterative, specific, 1-2 changes per prompt) proved valuable when working with Figma AI.
+
+---
+
+# Google Stitch - Initial Evaluation
 
 **Date**: October 27, 2025
 
@@ -305,10 +371,145 @@ When we use Stitch (Issue #11), we'll design in this order:
 
 ---
 
+## Implementation Framework: shadcn_ui for Flutter
+
+### Overview
+
+**shadcn_ui** is a Flutter port of the popular shadcn/ui design system, providing 40+ customizable components with a modern, clean aesthetic.
+
+**Package**: `shadcn_ui` v0.38.5
+**Documentation**: https://flutter-shadcn-ui.mariuti.com
+**License**: MIT (open source)
+
+### Why shadcn_ui?
+
+1. **Perfect complement to Stitch**: Design in Stitch → Implement with shadcn
+2. **Highly customizable**: Each component designed for extreme flexibility
+3. **Modern aesthetic**: Rounded corners, soft shadows, clean design (matches our vision)
+4. **Hybrid Material support**: Can use shadcn alongside Material components (critical for camera)
+5. **40+ components**: Exactly what we need for our app
+
+### Component Mapping for Our Screens
+
+#### Camera Capture Screen
+**Material Components** (camera functionality):
+- `Camera` widget from camera package
+- `CameraPreview` for live preview
+
+**shadcn Components** (UI overlays):
+- `ShadButton` - Capture button with rounded corners
+- `ShadCard` - Guidance text container at top
+- `ShadBadge` - Lighting quality indicator (Good/Poor)
+- `ShadToast` - Error messages (no face, multiple faces)
+
+#### Results Screen
+**shadcn Components**:
+- `ShadCard` - Photo display in rounded frame
+- `ShadProgress` - Confidence percentage indicator
+- `ShadBadge` - Monk scale category display
+- `ShadButton` - "Retake Photo", "View Recommendations", "How does this work?"
+- `ShadSheet` - Bottom sheet for scientific details
+- `ShadSeparator` - Visual dividers
+
+#### Recommendations Screen
+**shadcn Components**:
+- `ShadCard` - Product cards with images and descriptions
+- `ShadButton` - "Learn More" on each card
+- `ShadSelect` - Filter options (price, category, brand)
+- `ShadDialog` - Detailed product view modal
+- `ShadTabs` - Tab navigation (Skincare vs Makeup)
+
+#### History Screen
+**shadcn Components**:
+- `ShadCard` - History entry cards
+- `ShadCalendar` - Date-based filtering
+- `ShadTable` - Alternative list view
+- `ShadContextMenu` - Right-click/long-press options (view, delete)
+- `ShadSeparator` - Month dividers
+
+### Theming shadcn with Dracula/Alucard
+
+**Approach**: Create custom shadcn themes matching our Dracula/Alucard colors
+
+**Dark Theme** (Dracula):
+```dart
+ShadThemeData.dark(
+  colorScheme: ShadColorScheme(
+    background: Color(0xFF282A36),  // Dracula background
+    foreground: Color(0xFFF8F8F2),  // Dracula foreground
+    primary: Color(0xFFBD93F9),     // Purple accent
+    secondary: Color(0xFFFF79C6),   // Pink accent
+    // ... map all Dracula colors
+  ),
+)
+```
+
+**Light Theme** (Alucard):
+```dart
+ShadThemeData.light(
+  colorScheme: ShadColorScheme(
+    background: Color(0xFFF8F8F2),  // Alucard background
+    foreground: Color(0xFF282A36),  // Dark text
+    primary: Color(0xFFBD93F9),     // Purple accent (maintained)
+    secondary: Color(0xFFFF79C6),   // Pink accent (maintained)
+    // ... map all Alucard colors
+  ),
+)
+```
+
+**Custom Radius/Borders**:
+- Use rounded corners throughout (`borderRadius: BorderRadius.circular(12)`)
+- Soft shadows instead of hard borders
+- Match Stitch-generated designs
+
+---
+
+## Updated Workflow: Stitch + shadcn_ui
+
+### Phase 1: Design with Stitch (Issue #11)
+
+1. **Log into Stitch** (Google account required)
+2. **Generate initial designs** using our starting prompt:
+   > *"A warm and friendly beauty app for skin tone analysis and personalized skincare recommendations. Use soft, rounded design elements and a warm color palette with purple and pink accents."*
+3. **Iterate screen by screen** (1-2 changes per prompt)
+4. **Export to Figma** for reference and collaboration
+5. **Take screenshots** of final designs
+
+### Phase 2: Explore shadcn_ui (Issue #11)
+
+1. **Install shadcn_ui** in Flutter project
+2. **Explore components** using shadcn documentation
+3. **Create component inventory**:
+   - List all shadcn components we'll use
+   - Map to specific screens
+   - Note customization needs
+4. **Create custom Dracula/Alucard themes**
+5. **Build small demos** of key components with our themes
+
+### Phase 3: Component Mapping (Issue #11)
+
+For each Stitch-generated screen:
+1. **Identify shadcn components** that match the design
+2. **Document component properties** needed (colors, sizes, borders)
+3. **Note customizations** required
+4. **Create implementation plan** for each screen
+
+### Phase 4: Documentation (Issue #11)
+
+1. **Update this file** with:
+   - Screenshots of Stitch designs
+   - Component mapping details
+   - Theming code snippets
+   - Implementation notes
+2. **Create component library doc** (if needed)
+
+---
+
 ## Next Steps (Issue #11: Design UI/UX Mockups)
 
-When we move to Issue #11, we will:
+**Updated scope for Issue #11**:
 
+### Part A: Stitch Design Generation
 1. **Log into Stitch** (requires Google account)
 2. **Start with initial prompt**: "A warm and friendly beauty app for skin tone analysis..."
 3. **Generate 4 core screens**:
@@ -318,16 +519,43 @@ When we move to Issue #11, we will:
    - History
 4. **Iterate on each screen** with specific refinements (1-2 changes per prompt)
 5. **Export to Figma** for developer handoff and collaboration
-6. **Extract HTML/CSS code** for Flutter/Material Design reference
-7. **Document design decisions** in this file
+6. **Take screenshots** of final designs
+
+### Part B: shadcn_ui Exploration
+1. **Add shadcn_ui to pubspec.yaml**
+2. **Explore documentation** and available components
+3. **Create component inventory** for our app
+4. **Build Dracula/Alucard theme** for shadcn
+5. **Create small component demos** to test theming
+
+### Part C: Design-to-Implementation Mapping
+1. **Map Stitch designs to shadcn components**
+2. **Document component choices** for each screen
+3. **Note customizations** needed (colors, borders, spacing)
+4. **Create implementation plan** for next issues
+
+### Part D: Documentation
+1. **Update stitch-notes.md** with findings
+2. **Add screenshots** of Stitch designs
+3. **Document component mapping**
+4. **Create theming guide** for shadcn
 
 ---
 
 ## References
 
+**Design Tools**:
 - **Stitch Website**: https://stitch.withgoogle.com/
 - **Stitch Prompt Guide**: https://discuss.ai.google.dev/t/stitch-prompt-guide/83844
+
+**Implementation Framework**:
+- **shadcn_ui Package**: https://pub.dev/packages/shadcn_ui
+- **shadcn_ui Documentation**: https://flutter-shadcn-ui.mariuti.com
+
+**Internal Docs**:
 - **App Vision Document**: docs/design/app-vision.md (theme colors, product decisions)
+
+**Themes & Design**:
 - **Dracula Theme**: https://draculatheme.com/
 - **Monk Skin Tone Scale**: 10 categories (more inclusive than Fitzpatrick)
 

@@ -22,13 +22,51 @@ While this is an academic project for SEDS536, the app is designed **in spirit a
 - **YES**: Approachable and welcoming design
 - **YES**: Modern, inclusive, and respectful
 
-### Design System
+### Design & Implementation Framework
 
-Using **Google Stitch Design System** for:
-- Inclusive design principles
-- Accessibility-first approach
-- Consistent, professional components
-- Diversity and representation focus
+**Two-Layer Approach**:
+
+#### 1. Design Layer: Figma AI (AI-Powered UI Generation + Code)
+- **Purpose**: Generate UI mockups AND implementation code
+- **Tool**: Figma AI (https://figma.com)
+- **Features**:
+  - AI-powered design generation
+  - **Generates React/TypeScript code** (major advantage!)
+  - Complete shadcn/ui component library included
+  - Rapid iteration with natural language prompts
+  - Professional-grade designs with exact color codes
+- **Our Use**: Generated 5 complete screens with React code for Flutter reference
+
+**Tool Selection Note**: Initially evaluated Google Stitch (https://stitch.withgoogle.com), but pivoted to Figma AI because:
+- ✅ Figma generates **actual code** (not just mockups)
+- ✅ Includes complete component library (50+ shadcn components)
+- ✅ Exact color codes and styling already implemented
+- ✅ Direct mapping to Flutter shadcn_ui components
+- 📚 Stitch research documented in design-tools-research.md
+
+#### 2. Implementation Layer: shadcn_ui for Flutter
+- **Purpose**: Pre-built, customizable Flutter components
+- **Package**: `shadcn_ui` v0.38.5 ([pub.dev](https://pub.dev/packages/shadcn_ui))
+- **Documentation**: https://flutter-shadcn-ui.mariuti.com
+- **Features**:
+  - 40+ customizable components (Card, Dialog, Sheet, Input, Progress, etc.)
+  - Hybrid Material + shadcn support (critical for camera integration)
+  - Built-in theming with 12 color schemes
+  - Modern, clean aesthetic (rounded corners, soft shadows)
+  - MIT licensed, actively maintained
+- **Our Use**: Adapt Figma's React/shadcn code to Flutter/shadcn_ui
+
+**Design-to-Implementation Flow**:
+```
+Figma AI (generates React + shadcn code) → Analyze component structure → Map to Flutter shadcn_ui → Customize with Dracula/Alucard themes → Implement in Flutter
+```
+
+**Why This Combination**:
+- **Figma AI**: Generates both designs AND code, saving implementation time
+- **shadcn_ui**: Flutter port of same component library Figma uses (perfect match!)
+- **Direct mapping**: React shadcn components → Flutter shadcn_ui components
+- **Consistent theming**: Same color codes, rounded corners, shadows across platforms
+- **Code reference**: Figma's React code guides Flutter implementation
 
 ### Color Themes
 
@@ -229,7 +267,7 @@ Using **Google Stitch Design System** for:
 
 ### Phase 2: Enhanced (M3)
 - History feature with local storage
-- Improved UI with Stitch components
+- Improved UI with shadcn_ui components
 - Better error handling
 - Scientific details view
 
@@ -310,8 +348,22 @@ Using **Google Stitch Design System** for:
 
 ## References
 
-- Google Stitch Design System: https://stitch.withgoogle.com
-- Stitch Prompt Guide: https://discuss.ai.google.dev/t/stitch-prompt-guide/83844
+**Design Tools**:
+- Figma AI: https://figma.com
+- Figma Generated Code: docs/design/figma/project/
+- Google Stitch (evaluated): https://stitch.withgoogle.com
+- Tool Comparison: docs/design/design-tools-research.md
+
+**Implementation Framework**:
+- shadcn_ui Flutter Package: https://pub.dev/packages/shadcn_ui
+- shadcn_ui Documentation: https://flutter-shadcn-ui.mariuti.com
+- shadcn/ui (React, used by Figma): https://ui.shadcn.com
+
+**Design Themes**:
+- Dracula Theme: https://draculatheme.com
+- Alucard Theme: (Dracula's light mode counterpart)
+
+**Research**:
 - Monk Skin Tone Scale: (see research docs)
 
 ---
