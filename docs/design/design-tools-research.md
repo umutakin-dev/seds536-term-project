@@ -1,6 +1,72 @@
-# Stitch Design System - Study Notes
+# Design Tools Research & Selection
 
-**Purpose**: Document key takeaways from studying Google's Stitch and how to apply it to our skin tone detection app.
+**Purpose**: Document evaluation of AI-powered design tools (Stitch vs Figma) and final tool selection for the skin tone detection app.
+
+**Date**: October 27 - November 8, 2025
+
+---
+
+## ✅ Final Decision: Figma AI
+
+**Tool Selected**: Figma AI Free Tier (https://figma.com)
+
+**Why Figma Over Stitch**:
+1. **Generates actual code** - React/TypeScript implementation, not just mockups
+2. **Complete component library** - Includes 50+ shadcn/ui components
+3. **Exact specifications** - Color codes, spacing, borders already implemented
+4. **Direct Flutter mapping** - shadcn/ui (React) → shadcn_ui (Flutter)
+5. **Time savings** - Code provides implementation reference
+
+**Limitations (Free Tier)**:
+- ⚠️ **Limited daily quota** - Reached quota after generating 5 screens + iterations
+- ⚠️ **Sufficient for MVP** - Got all core screens needed for initial implementation
+- ✅ **Code is reusable** - Can reference and adapt generated code without regenerating
+- 💡 **For future iterations** - May need paid tier or wait for quota reset
+
+### What We Generated with Figma AI
+
+**5 Complete Screens** (6,437 lines of React/TypeScript code):
+
+1. **Home.tsx** (132 lines)
+   - Welcome dashboard with "Start Analysis" CTA
+   - Tips card and navigation
+
+2. **SkinAnalysis.tsx** (409 lines)
+   - 4-step flow: Instructions → Camera → Analyzing → Results
+   - Camera with lighting quality indicator (purple-pink gradient)
+   - **Monk Skin Tone Scale (10 colors)**: #F6EDE4 → #3A2416
+   - Confidence score with circular progress ring
+   - Face guide with purple/pink corner highlights
+
+3. **Recommendations.tsx** (157 lines)
+   - Product cards with images and descriptions
+   - Filters and category tabs
+
+4. **History.tsx** (180 lines)
+   - Timeline grouped by month
+   - Swipe-to-delete hints
+   - Empty state
+   - Export functionality
+
+5. **Profile.tsx** (117 lines)
+   - User profile with achievements
+   - Settings menu items
+
+**Bonus**: Complete shadcn/ui component library (Button, Card, Dialog, Progress, Sheet, etc.)
+
+**Location**: `docs/design/figma/project/`
+
+---
+
+## 📚 Stitch Research (Historical Context)
+
+Below is our initial evaluation of Google Stitch. We studied Stitch's methodology and prompting techniques, which informed our approach with Figma. This research is preserved for academic documentation purposes.
+
+**Note**: While we ultimately chose Figma, the Stitch prompting methodology (iterative, specific, 1-2 changes per prompt) proved valuable when working with Figma AI.
+
+---
+
+# Google Stitch - Initial Evaluation
 
 **Date**: October 27, 2025
 

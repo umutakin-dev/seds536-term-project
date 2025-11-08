@@ -26,15 +26,23 @@ While this is an academic project for SEDS536, the app is designed **in spirit a
 
 **Two-Layer Approach**:
 
-#### 1. Design Layer: Google Stitch (AI-Powered UI Generation)
-- **Purpose**: Generate UI mockups and design inspiration
-- **Tool**: https://stitch.withgoogle.com
+#### 1. Design Layer: Figma AI (AI-Powered UI Generation + Code)
+- **Purpose**: Generate UI mockups AND implementation code
+- **Tool**: Figma AI (https://figma.com)
 - **Features**:
-  - AI-powered design generation using Gemini
-  - Rapid prototyping and iteration
-  - Export to Figma and HTML/CSS
-  - Natural language prompting
-- **Our Use**: Create initial screen designs, refine layouts, establish visual direction
+  - AI-powered design generation
+  - **Generates React/TypeScript code** (major advantage!)
+  - Complete shadcn/ui component library included
+  - Rapid iteration with natural language prompts
+  - Professional-grade designs with exact color codes
+- **Our Use**: Generated 5 complete screens with React code for Flutter reference
+
+**Tool Selection Note**: Initially evaluated Google Stitch (https://stitch.withgoogle.com), but pivoted to Figma AI because:
+- ✅ Figma generates **actual code** (not just mockups)
+- ✅ Includes complete component library (50+ shadcn components)
+- ✅ Exact color codes and styling already implemented
+- ✅ Direct mapping to Flutter shadcn_ui components
+- 📚 Stitch research documented in design-tools-research.md
 
 #### 2. Implementation Layer: shadcn_ui for Flutter
 - **Purpose**: Pre-built, customizable Flutter components
@@ -46,19 +54,19 @@ While this is an academic project for SEDS536, the app is designed **in spirit a
   - Built-in theming with 12 color schemes
   - Modern, clean aesthetic (rounded corners, soft shadows)
   - MIT licensed, actively maintained
-- **Our Use**: Implement actual Flutter UI using pre-built, customizable components
+- **Our Use**: Adapt Figma's React/shadcn code to Flutter/shadcn_ui
 
 **Design-to-Implementation Flow**:
 ```
-Stitch (mockups) → Identify shadcn components → Customize with Dracula/Alucard themes → Implement in Flutter
+Figma AI (generates React + shadcn code) → Analyze component structure → Map to Flutter shadcn_ui → Customize with Dracula/Alucard themes → Implement in Flutter
 ```
 
 **Why This Combination**:
-- **Stitch**: Provides warm, friendly design direction aligned with our vision
-- **shadcn_ui**: Provides professional, customizable components for rapid implementation
-- **Synergy**: Design in Stitch, implement with shadcn, customize to match our aesthetic
-- **Inclusive design**: Both tools support accessibility and modern design patterns
-- **Flexibility**: shadcn's extreme customizability allows matching Stitch designs
+- **Figma AI**: Generates both designs AND code, saving implementation time
+- **shadcn_ui**: Flutter port of same component library Figma uses (perfect match!)
+- **Direct mapping**: React shadcn components → Flutter shadcn_ui components
+- **Consistent theming**: Same color codes, rounded corners, shadows across platforms
+- **Code reference**: Figma's React code guides Flutter implementation
 
 ### Color Themes
 
@@ -259,7 +267,7 @@ Stitch (mockups) → Identify shadcn components → Customize with Dracula/Aluca
 
 ### Phase 2: Enhanced (M3)
 - History feature with local storage
-- Improved UI with Stitch components
+- Improved UI with shadcn_ui components
 - Better error handling
 - Scientific details view
 
@@ -341,12 +349,15 @@ Stitch (mockups) → Identify shadcn components → Customize with Dracula/Aluca
 ## References
 
 **Design Tools**:
-- Google Stitch: https://stitch.withgoogle.com
-- Stitch Prompt Guide: https://discuss.ai.google.dev/t/stitch-prompt-guide/83844
+- Figma AI: https://figma.com
+- Figma Generated Code: docs/design/figma/project/
+- Google Stitch (evaluated): https://stitch.withgoogle.com
+- Tool Comparison: docs/design/design-tools-research.md
 
 **Implementation Framework**:
 - shadcn_ui Flutter Package: https://pub.dev/packages/shadcn_ui
 - shadcn_ui Documentation: https://flutter-shadcn-ui.mariuti.com
+- shadcn/ui (React, used by Figma): https://ui.shadcn.com
 
 **Design Themes**:
 - Dracula Theme: https://draculatheme.com
