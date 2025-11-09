@@ -41,6 +41,9 @@ dependencies:
   # Permission handling for camera and other device features
   permission_handler: ^11.3.1
 
+  # Declarative routing and navigation
+  go_router: ^14.6.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
