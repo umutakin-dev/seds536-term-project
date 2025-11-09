@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -12,29 +13,30 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Camera Test',
+      title: 'Skin Tone Analyzer',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: const CameraTestScreen(),
+      home: const CameraScreen(),
     );
   }
 }
 
-class CameraTestScreen extends StatefulWidget {
-  const CameraTestScreen({super.key});
+class CameraScreen extends StatefulWidget {
+  const CameraScreen({super.key});
 
   @override
-  State<CameraTestScreen> createState() => _CameraTestScreenState();
+  State<CameraScreen> createState() => _CameraScreenState();
 }
 
-class _CameraTestScreenState extends State<CameraTestScreen> {
+class _CameraScreenState extends State<CameraScreen> {
   CameraController? _controller;
   List<CameraDescription>? _cameras;
   bool _isLoading = true;
   String _statusMessage = 'Initializing...';
   PermissionStatus? _cameraPermissionStatus;
   int _currentCameraIndex = 0;
+  XFile? _capturedImage;
 
   @override
   void initState() {
@@ -151,6 +153,42 @@ class _CameraTestScreenState extends State<CameraTestScreen> {
     }
   }
 
+  Future<void> _takePicture() async {
+    if (_controller == null || !_controller!.value.isInitialized) {
+      return;
+    }
+
+    try {
+      // Take the picture and get the file
+      final image = await _controller!.takePicture();
+
+      setState(() {
+        _capturedImage = image;
+      });
+    } catch (e) {
+      // Show error to user
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error capturing image: $e')),
+        );
+      }
+    }
+  }
+
+  void _retakePicture() {
+    setState(() {
+      _capturedImage = null;
+    });
+  }
+
+  void _confirmPicture() {
+    // For now, just show a message
+    // Later this will navigate to the next screen for analysis
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Image confirmed! (Analysis screen coming soon)')),
+    );
+  }
+
   @override
   void dispose() {
     _controller?.dispose();
@@ -159,67 +197,142 @@ class _CameraTestScreenState extends State<CameraTestScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // If we have a captured image, show preview screen
+    if (_capturedImage != null) {
+      return Scaffold(
+        appBar: AppBar(
+          backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+          title: const Text('Preview'),
+        ),
+        body: Column(
+          children: [
+            Expanded(
+              child: Center(
+                child: Image.file(
+                  File(_capturedImage!.path),
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _retakePicture,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Retake'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _confirmPicture,
+                      icon: const Icon(Icons.check),
+                      label: const Text('Confirm'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Otherwise show camera screen
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: const Text('Camera Test - Issue #12'),
+        title: const Text('Skin Tone Analyzer'),
       ),
-      body: Center(
-        child: _isLoading
-            ? const CircularProgressIndicator()
-            : SingleChildScrollView(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                  // Camera preview or status message
-                  if (_controller != null && _controller!.value.isInitialized)
-                    Stack(
-                      children: [
-                        Container(
-                          width: 300,
-                          height: 400,
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.teal, width: 2),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
+              children: [
+                // Camera preview or status message
+                Expanded(
+                  child: _controller != null && _controller!.value.isInitialized
+                      ? Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            CameraPreview(_controller!),
+                            // Switch camera button overlay
+                            if (_cameras != null && _cameras!.length > 1)
+                              Positioned(
+                                top: 16,
+                                right: 16,
+                                child: FloatingActionButton(
+                                  mini: true,
+                                  onPressed: _switchCamera,
+                                  backgroundColor: Colors.white.withValues(alpha: 0.8),
+                                  child: const Icon(Icons.flip_camera_ios),
+                                ),
+                              ),
+                          ],
+                        )
+                      : Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  _statusMessage,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(fontSize: 16),
+                                ),
+                                const SizedBox(height: 20),
+                                if (_cameraPermissionStatus != null &&
+                                    !_cameraPermissionStatus!.isGranted)
+                                  ElevatedButton(
+                                    onPressed: _requestCameraPermission,
+                                    child: const Text('Grant Camera Permission'),
+                                  ),
+                              ],
+                            ),
                           ),
-                          child: CameraPreview(_controller!),
                         ),
-                        // Switch camera button overlay
-                        if (_cameras != null && _cameras!.length > 1)
-                          Positioned(
-                            bottom: 10,
-                            right: 10,
-                            child: FloatingActionButton(
-                              mini: true,
-                              onPressed: _switchCamera,
-                              child: const Icon(Icons.flip_camera_ios),
+                ),
+                // Capture button
+                if (_controller != null && _controller!.value.isInitialized)
+                  Container(
+                    padding: const EdgeInsets.all(24.0),
+                    color: Colors.black,
+                    child: Center(
+                      child: GestureDetector(
+                        onTap: _takePicture,
+                        child: Container(
+                          width: 70,
+                          height: 70,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 4),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(4.0),
+                            child: Container(
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
-                      ],
-                    )
-                  else
-                    Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        children: [
-                          Text(
-                            _statusMessage,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(fontSize: 16),
-                          ),
-                          const SizedBox(height: 20),
-                          // Only show permission request button if needed
-                          if (_cameraPermissionStatus != null && !_cameraPermissionStatus!.isGranted)
-                            ElevatedButton(
-                              onPressed: _requestCameraPermission,
-                              child: const Text('Grant Camera Permission'),
-                            ),
-                        ],
+                        ),
                       ),
                     ),
-                  ],
-                ),
-              ),
-      ),
+                  ),
+              ],
+            ),
     );
   }
 }
