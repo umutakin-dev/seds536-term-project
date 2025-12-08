@@ -35,6 +35,15 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
 
+  # Camera access for image capture
+  camera: ^0.11.0+2
+
+  # Permission handling for camera and other device features
+  permission_handler: ^11.3.1
+
+  # Declarative routing and navigation
+  go_router: ^14.6.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
