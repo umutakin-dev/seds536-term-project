@@ -296,25 +296,27 @@ class _CameraScreenState extends State<CameraScreen> {
                 ),
                 // Capture button
                 if (_controller != null && _controller!.value.isInitialized)
-                  Container(
-                    padding: const EdgeInsets.all(24.0),
-                    color: Colors.black,
-                    child: Center(
-                      child: GestureDetector(
-                        onTap: _takePicture,
-                        child: Container(
-                          width: 70,
-                          height: 70,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 4),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(4.0),
-                            child: Container(
-                              decoration: const BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Colors.white,
+                  SafeArea(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 24.0),
+                      color: Colors.black,
+                      child: Center(
+                        child: GestureDetector(
+                          onTap: _takePicture,
+                          child: Container(
+                            width: 70,
+                            height: 70,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 4),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(4.0),
+                              child: Container(
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
                           ),
