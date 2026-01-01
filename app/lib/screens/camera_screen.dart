@@ -208,12 +208,15 @@ class _CameraScreenState extends State<CameraScreen> {
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.all(8.0),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      image: DecorationImage(
-                        image: FileImage(File(_capturedImage!.path)),
-                        fit: BoxFit.cover,
+                  child: Transform.flip(
+                    flipX: true, // Mirror horizontally to match camera preview
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        image: DecorationImage(
+                          image: FileImage(File(_capturedImage!.path)),
+                          fit: BoxFit.cover,
+                        ),
                       ),
                     ),
                   ),
