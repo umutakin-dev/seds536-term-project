@@ -1,10 +1,12 @@
 import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:go_router/go_router.dart';
 import '../services/face_detection_service.dart';
+import '../services/image_processing_service.dart';
 import '../widgets/face_overlay.dart';
 
 class CameraScreen extends StatefulWidget {
@@ -25,8 +27,11 @@ class _CameraScreenState extends State<CameraScreen> {
 
   // Face detection
   final FaceDetectionService _faceDetectionService = FaceDetectionService();
+  final ImageProcessingService _imageProcessingService = ImageProcessingService();
   List<Face> _detectedFaces = [];
   bool _isDetecting = false;
+  ui.Rect? _capturedFaceRect;
+  bool _isProcessing = false;
 
   @override
   void initState() {
@@ -182,7 +187,14 @@ class _CameraScreenState extends State<CameraScreen> {
       return;
     }
 
+    if (_detectedFaces.isEmpty) {
+      return;
+    }
+
     try {
+      // Store the face rect before stopping detection
+      _capturedFaceRect = _detectedFaces.first.boundingBox;
+
       // Stop the image stream before taking picture
       await _stopFaceDetection();
 
@@ -205,19 +217,62 @@ class _CameraScreenState extends State<CameraScreen> {
   void _retakePicture() {
     setState(() {
       _capturedImage = null;
+      _capturedFaceRect = null;
       _detectedFaces = [];
     });
     // Restart face detection
     _startFaceDetection();
   }
 
-  void _confirmPicture() {
-    if (_capturedImage == null) return;
+  Future<void> _confirmPicture() async {
+    if (_capturedImage == null || _capturedFaceRect == null) return;
+    if (_isProcessing) return;
 
-    // Navigate to results screen with the captured image
-    context.go('/results', extra: {
-      'imagePath': _capturedImage!.path,
+    setState(() {
+      _isProcessing = true;
     });
+
+    try {
+      // Get image size from camera preview
+      final imageSize = ui.Size(
+        _controller!.value.previewSize!.height,
+        _controller!.value.previewSize!.width,
+      );
+
+      // Extract face from the captured image
+      final isFrontCamera = _cameras![_currentCameraIndex].lensDirection == CameraLensDirection.front;
+      final facePath = await _imageProcessingService.extractFace(
+        imagePath: _capturedImage!.path,
+        faceRect: _capturedFaceRect!,
+        imageSize: imageSize,
+        isFrontCamera: isFrontCamera,
+        padding: 0.3, // 30% padding around face
+      );
+
+      if (facePath != null && mounted) {
+        // Navigate to results screen with the cropped face image
+        context.go('/results', extra: {
+          'imagePath': facePath,
+        });
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to extract face. Please try again.')),
+        );
+        _retakePicture();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error processing image: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+        });
+      }
+    }
   }
 
   @override
@@ -333,9 +388,18 @@ class _CameraScreenState extends State<CameraScreen> {
                         child: SizedBox(
                           height: 56,
                           child: ElevatedButton.icon(
-                            onPressed: _confirmPicture,
-                            icon: const Icon(Icons.check),
-                            label: const Text('Confirm'),
+                            onPressed: _isProcessing ? null : _confirmPicture,
+                            icon: _isProcessing
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Icon(Icons.check),
+                            label: Text(_isProcessing ? 'Processing...' : 'Confirm'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green,
                               foregroundColor: Colors.white,

@@ -47,6 +47,12 @@ dependencies:
   # Face detection using Google ML Kit
   google_mlkit_face_detection: ^0.12.0
 
+  # Image processing for face extraction
+  image: ^4.3.0
+
+  # File system paths
+  path_provider: ^2.1.5
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
