@@ -19,7 +19,7 @@ class ImageProcessingService {
     required ui.Rect faceRect,
     required ui.Size imageSize,
     bool isFrontCamera = true,
-    double padding = 0.2,
+    double padding = 0.3,
   }) async {
     try {
       // Read the source image

@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image/image.dart' as img;
 
 class ResultsScreen extends StatelessWidget {
   final String imagePath;
@@ -58,7 +59,7 @@ class ResultsScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Captured Image - takes 40% of available space
+                      // Extracted Face Image - full width, centered face with dominant color background
                       Expanded(
                         flex: 4,
                         child: Container(
@@ -74,10 +75,7 @@ class ResultsScreen extends StatelessWidget {
                           ),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(24),
-                            child: Image.file(
-                              File(imagePath),
-                              fit: BoxFit.cover,
-                            ),
+                            child: _FaceImageWithBackground(imagePath: imagePath),
                           ),
                         ),
                       ),
@@ -223,6 +221,82 @@ class _AnalysisItem extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Widget that displays face image centered with dominant color as background
+class _FaceImageWithBackground extends StatefulWidget {
+  final String imagePath;
+
+  const _FaceImageWithBackground({required this.imagePath});
+
+  @override
+  State<_FaceImageWithBackground> createState() => _FaceImageWithBackgroundState();
+}
+
+class _FaceImageWithBackgroundState extends State<_FaceImageWithBackground> {
+  Color? _dominantColor;
+
+  @override
+  void initState() {
+    super.initState();
+    _calculateDominantColor();
+  }
+
+  Future<void> _calculateDominantColor() async {
+    try {
+      final file = File(widget.imagePath);
+      final bytes = await file.readAsBytes();
+      final image = img.decodeImage(bytes);
+
+      if (image == null) return;
+
+      // Sample pixels from the image to find median color
+      int totalR = 0, totalG = 0, totalB = 0;
+      int sampleCount = 0;
+
+      // Sample every 10th pixel for performance
+      for (int y = 0; y < image.height; y += 10) {
+        for (int x = 0; x < image.width; x += 10) {
+          final pixel = image.getPixel(x, y);
+          totalR += pixel.r.toInt();
+          totalG += pixel.g.toInt();
+          totalB += pixel.b.toInt();
+          sampleCount++;
+        }
+      }
+
+      if (sampleCount > 0 && mounted) {
+        setState(() {
+          _dominantColor = Color.fromRGBO(
+            totalR ~/ sampleCount,
+            totalG ~/ sampleCount,
+            totalB ~/ sampleCount,
+            1.0,
+          );
+        });
+      }
+    } catch (e) {
+      // Fallback to dark color if calculation fails
+      if (mounted) {
+        setState(() {
+          _dominantColor = const Color(0xFF44475A);
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: _dominantColor ?? const Color(0xFF44475A),
+      child: Center(
+        child: Image.file(
+          File(widget.imagePath),
+          fit: BoxFit.contain,
+        ),
+      ),
     );
   }
 }
