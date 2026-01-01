@@ -51,10 +51,10 @@ class ResultsScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              // Content
+              // Scrollable Content
               Expanded(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(24.0),
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -74,12 +74,12 @@ class ResultsScreen extends StatelessWidget {
                           borderRadius: BorderRadius.circular(24),
                           child: Image.file(
                             File(imagePath),
-                            height: 300,
+                            height: 250,
                             fit: BoxFit.cover,
                           ),
                         ),
                       ),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 24),
                       // Analysis Placeholder
                       Container(
                         padding: const EdgeInsets.all(24),
@@ -154,29 +154,33 @@ class ResultsScreen extends StatelessWidget {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 24),
-                      // Action Button
-                      ElevatedButton.icon(
-                        onPressed: () => context.go('/'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFBD93F9),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          elevation: 0,
-                        ),
-                        icon: const Icon(Icons.home),
-                        label: const Text(
-                          'Back to Home',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
+                      const SizedBox(height: 16),
                     ],
+                  ),
+                ),
+              ),
+              // Sticky Footer - Back to Home Button
+              Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: ElevatedButton.icon(
+                  onPressed: () => context.go('/'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFBD93F9),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    elevation: 0,
+                    minimumSize: const Size(double.infinity, 56),
+                  ),
+                  icon: const Icon(Icons.home),
+                  label: const Text(
+                    'Back to Home',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ),

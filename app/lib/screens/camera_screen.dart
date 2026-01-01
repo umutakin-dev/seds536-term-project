@@ -191,47 +191,71 @@ class _CameraScreenState extends State<CameraScreen> {
             onPressed: () => context.go('/'),
           ),
         ),
-        body: Column(
-          children: [
-            Expanded(
-              child: Center(
-                child: Image.file(
-                  File(_capturedImage!.path),
-                  fit: BoxFit.contain,
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color(0xFF44475A), // Dracula background
+                Color(0xFF282A36), // Darker Dracula
+              ],
+            ),
+          ),
+          child: Column(
+            children: [
+              // Image area - same padding as camera screen
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      image: DecorationImage(
+                        image: FileImage(File(_capturedImage!.path)),
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
                 ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: _retakePicture,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Retake'),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+              // Button area - same height as camera capture button area
+              SafeArea(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 16.0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: SizedBox(
+                          height: 56,
+                          child: ElevatedButton.icon(
+                            onPressed: _retakePicture,
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Retake'),
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: _confirmPicture,
-                      icon: const Icon(Icons.check),
-                      label: const Text('Confirm'),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        backgroundColor: Colors.green,
-                        foregroundColor: Colors.white,
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: SizedBox(
+                          height: 56,
+                          child: ElevatedButton.icon(
+                            onPressed: _confirmPicture,
+                            icon: const Icon(Icons.check),
+                            label: const Text('Confirm'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     }
@@ -246,76 +270,105 @@ class _CameraScreenState extends State<CameraScreen> {
           onPressed: () => context.go('/'),
         ),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                // Camera preview or status message
-                Expanded(
-                  child: _controller != null && _controller!.value.isInitialized
-                      ? Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            CameraPreview(_controller!),
-                            // Switch camera button overlay
-                            if (_cameras != null && _cameras!.length > 1)
-                              Positioned(
-                                top: 16,
-                                right: 16,
-                                child: FloatingActionButton(
-                                  mini: true,
-                                  onPressed: _switchCamera,
-                                  backgroundColor: Colors.white.withValues(alpha: 0.8),
-                                  child: const Icon(Icons.flip_camera_ios),
-                                ),
-                              ),
-                          ],
-                        )
-                      : Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  _statusMessage,
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(fontSize: 16),
-                                ),
-                                const SizedBox(height: 20),
-                                if (_cameraPermissionStatus != null &&
-                                    !_cameraPermissionStatus!.isGranted)
-                                  ElevatedButton(
-                                    onPressed: _requestCameraPermission,
-                                    child: const Text('Grant Camera Permission'),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFF44475A), // Dracula background
+              Color(0xFF282A36), // Darker Dracula
+            ],
+          ),
+        ),
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator(color: Colors.white))
+            : Column(
+                children: [
+                  // Camera preview or status message
+                  Expanded(
+                    child: _controller != null && _controller!.value.isInitialized
+                        ? Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(16),
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  // Use FittedBox to maintain aspect ratio while filling space
+                                  FittedBox(
+                                    fit: BoxFit.cover,
+                                    clipBehavior: Clip.hardEdge,
+                                    child: SizedBox(
+                                      width: _controller!.value.previewSize!.height,
+                                      height: _controller!.value.previewSize!.width,
+                                      child: CameraPreview(_controller!),
+                                    ),
                                   ),
-                              ],
+                                  // Switch camera button overlay
+                                  if (_cameras != null && _cameras!.length > 1)
+                                    Positioned(
+                                      top: 16,
+                                      right: 16,
+                                      child: FloatingActionButton(
+                                        mini: true,
+                                        onPressed: _switchCamera,
+                                        backgroundColor: Colors.white.withValues(alpha: 0.8),
+                                        child: const Icon(Icons.flip_camera_ios),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          )
+                        : Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    _statusMessage,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(fontSize: 16, color: Colors.white),
+                                  ),
+                                  const SizedBox(height: 20),
+                                  if (_cameraPermissionStatus != null &&
+                                      !_cameraPermissionStatus!.isGranted)
+                                    ElevatedButton(
+                                      onPressed: _requestCameraPermission,
+                                      child: const Text('Grant Camera Permission'),
+                                    ),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                ),
-                // Capture button
-                if (_controller != null && _controller!.value.isInitialized)
-                  SafeArea(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 24.0),
-                      color: Colors.black,
-                      child: Center(
-                        child: GestureDetector(
-                          onTap: _takePicture,
-                          child: Container(
-                            width: 70,
-                            height: 70,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 4),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(4.0),
+                  ),
+                  // Capture button - same container height as preview buttons
+                  if (_controller != null && _controller!.value.isInitialized)
+                    SafeArea(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 16.0),
+                        child: SizedBox(
+                          height: 56,
+                          child: Center(
+                            child: GestureDetector(
+                              onTap: _takePicture,
                               child: Container(
-                                decoration: const BoxDecoration(
+                                width: 56,
+                                height: 56,
+                                decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  color: Colors.white,
+                                  border: Border.all(color: Colors.white, width: 3),
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(3.0),
+                                  child: Container(
+                                    decoration: const BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: Colors.white,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
@@ -323,9 +376,9 @@ class _CameraScreenState extends State<CameraScreen> {
                         ),
                       ),
                     ),
-                  ),
-              ],
-            ),
+                ],
+              ),
+      ),
     );
   }
 }
