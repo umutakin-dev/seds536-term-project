@@ -240,12 +240,10 @@ class _CameraScreenState extends State<CameraScreen> {
       );
 
       // Extract face from the captured image
-      final isFrontCamera = _cameras![_currentCameraIndex].lensDirection == CameraLensDirection.front;
       final facePath = await _imageProcessingService.extractFace(
         imagePath: _capturedImage!.path,
         faceRect: _capturedFaceRect!,
         imageSize: imageSize,
-        isFrontCamera: isFrontCamera,
         padding: 0.3, // 30% padding around face
       );
 

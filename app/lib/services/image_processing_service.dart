@@ -10,7 +10,6 @@ class ImageProcessingService {
   /// [imagePath] - Path to the source image
   /// [faceRect] - Bounding box of the detected face
   /// [imageSize] - Size of the image as reported by ML Kit
-  /// [isFrontCamera] - Whether the image was taken with front camera (needs mirroring)
   /// [padding] - Extra padding around the face (as percentage, e.g., 0.2 = 20%)
   ///
   /// Returns the path to the cropped face image
@@ -18,7 +17,6 @@ class ImageProcessingService {
     required String imagePath,
     required ui.Rect faceRect,
     required ui.Size imageSize,
-    bool isFrontCamera = true,
     double padding = 0.3,
   }) async {
     try {
@@ -41,10 +39,11 @@ class ImageProcessingService {
       double width = faceRect.width * scaleX;
       double height = faceRect.height * scaleY;
 
-      // Mirror X coordinates for front camera (image is not mirrored but preview was)
-      if (isFrontCamera) {
-        left = sourceImage.width - left - width;
-      }
+      // Note: No mirroring needed here because:
+      // - The captured image file is NOT mirrored (raw camera output)
+      // - The face rect from ML Kit is based on the unmirrored camera stream
+      // - Both are in the same coordinate system
+      // (The preview display mirrors for front camera, but that's display-side only)
 
       // Add padding
       final paddingX = width * padding;
