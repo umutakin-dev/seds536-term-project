@@ -61,11 +61,6 @@ class FaceOverlayPainter extends CustomPainter {
   }
 
   Rect _scaleRect(Rect rect) {
-    // ML Kit returns coords in original image space (480x720)
-    // We need to flip Y because ML Kit's Y origin is opposite to display
-    final flippedTop = imageSize.height - rect.bottom;
-    final flippedBottom = imageSize.height - rect.top;
-
     // Calculate scale for BoxFit.cover
     final scaleX = widgetSize.width / imageSize.width;
     final scaleY = widgetSize.height / imageSize.height;
@@ -77,11 +72,11 @@ class FaceOverlayPainter extends CustomPainter {
     final offsetX = (scaledWidth - widgetSize.width) / 2;
     final offsetY = (scaledHeight - widgetSize.height) / 2;
 
-    // Apply scale and offset with flipped Y
+    // Apply scale and offset
     double left = rect.left * scale - offsetX;
-    double top = flippedTop * scale - offsetY;
+    double top = rect.top * scale - offsetY;
     double right = rect.right * scale - offsetX;
-    double bottom = flippedBottom * scale - offsetY;
+    double bottom = rect.bottom * scale - offsetY;
 
     // Mirror for front camera (preview is mirrored)
     if (isFrontCamera) {
