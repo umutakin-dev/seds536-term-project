@@ -1,8 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
+import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:go_router/go_router.dart';
+import '../services/face_detection_service.dart';
+import '../widgets/face_overlay.dart';
 
 class CameraScreen extends StatefulWidget {
   const CameraScreen({super.key});
@@ -19,6 +22,11 @@ class _CameraScreenState extends State<CameraScreen> {
   PermissionStatus? _cameraPermissionStatus;
   int _currentCameraIndex = 0;
   XFile? _capturedImage;
+
+  // Face detection
+  final FaceDetectionService _faceDetectionService = FaceDetectionService();
+  List<Face> _detectedFaces = [];
+  bool _isDetecting = false;
 
   @override
   void initState() {
@@ -64,6 +72,9 @@ class _CameraScreenState extends State<CameraScreen> {
 
       await _controller!.initialize();
 
+      // Start face detection stream
+      _startFaceDetection();
+
       setState(() {
         _statusMessage = 'Camera initialized successfully!\n${_cameras!.length} camera(s) found\nUsing: ${camera.lensDirection.name} camera';
         _isLoading = false;
@@ -73,6 +84,32 @@ class _CameraScreenState extends State<CameraScreen> {
         _statusMessage = 'Error initializing camera: $e';
         _isLoading = false;
       });
+    }
+  }
+
+  void _startFaceDetection() {
+    if (_controller == null || !_controller!.value.isInitialized) return;
+
+    _controller!.startImageStream((image) async {
+      if (_isDetecting) return;
+      _isDetecting = true;
+
+      final camera = _cameras![_currentCameraIndex];
+      final result = await _faceDetectionService.detectFacesFromCamera(image, camera);
+
+      if (result != null && mounted) {
+        setState(() {
+          _detectedFaces = result.faces;
+        });
+      }
+
+      _isDetecting = false;
+    });
+  }
+
+  Future<void> _stopFaceDetection() async {
+    if (_controller != null && _controller!.value.isStreamingImages) {
+      await _controller!.stopImageStream();
     }
   }
 
@@ -106,9 +143,11 @@ class _CameraScreenState extends State<CameraScreen> {
     setState(() {
       _isLoading = true;
       _statusMessage = 'Switching camera...';
+      _detectedFaces = [];
     });
 
-    // Dispose current controller
+    // Stop face detection and dispose current controller
+    await _stopFaceDetection();
     await _controller?.dispose();
 
     // Switch to next camera
@@ -122,6 +161,9 @@ class _CameraScreenState extends State<CameraScreen> {
       );
 
       await _controller!.initialize();
+
+      // Restart face detection with new camera
+      _startFaceDetection();
 
       setState(() {
         _statusMessage = 'Switched to ${camera.lensDirection.name} camera';
@@ -141,6 +183,9 @@ class _CameraScreenState extends State<CameraScreen> {
     }
 
     try {
+      // Stop the image stream before taking picture
+      await _stopFaceDetection();
+
       // Take the picture and get the file
       final image = await _controller!.takePicture();
 
@@ -160,7 +205,10 @@ class _CameraScreenState extends State<CameraScreen> {
   void _retakePicture() {
     setState(() {
       _capturedImage = null;
+      _detectedFaces = [];
     });
+    // Restart face detection
+    _startFaceDetection();
   }
 
   void _confirmPicture() {
@@ -174,8 +222,50 @@ class _CameraScreenState extends State<CameraScreen> {
 
   @override
   void dispose() {
+    _stopFaceDetection();
     _controller?.dispose();
+    _faceDetectionService.dispose();
     super.dispose();
+  }
+
+  Widget _buildFaceStatusIndicator() {
+    String message;
+    Color color;
+    IconData icon;
+
+    if (_detectedFaces.isEmpty) {
+      message = 'Position your face in the frame';
+      color = Colors.orange;
+      icon = Icons.face_retouching_off;
+    } else if (_detectedFaces.length == 1) {
+      message = 'Face detected';
+      color = Colors.green;
+      icon = Icons.face;
+    } else {
+      message = 'Multiple faces detected - position one person';
+      color = Colors.orange;
+      icon = Icons.people;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 8),
+          Text(
+            message,
+            style: TextStyle(color: color, fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -295,32 +385,50 @@ class _CameraScreenState extends State<CameraScreen> {
                             padding: const EdgeInsets.all(8.0),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(16),
-                              child: Stack(
-                                fit: StackFit.expand,
-                                children: [
-                                  // Use FittedBox to maintain aspect ratio while filling space
-                                  FittedBox(
-                                    fit: BoxFit.cover,
-                                    clipBehavior: Clip.hardEdge,
-                                    child: SizedBox(
-                                      width: _controller!.value.previewSize!.height,
-                                      height: _controller!.value.previewSize!.width,
-                                      child: CameraPreview(_controller!),
-                                    ),
-                                  ),
-                                  // Switch camera button overlay
-                                  if (_cameras != null && _cameras!.length > 1)
-                                    Positioned(
-                                      top: 16,
-                                      right: 16,
-                                      child: FloatingActionButton(
-                                        mini: true,
-                                        onPressed: _switchCamera,
-                                        backgroundColor: Colors.white.withValues(alpha: 0.8),
-                                        child: const Icon(Icons.flip_camera_ios),
+                              child: LayoutBuilder(
+                                builder: (context, constraints) {
+                                  return Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      // Use FittedBox to maintain aspect ratio while filling space
+                                      FittedBox(
+                                        fit: BoxFit.cover,
+                                        clipBehavior: Clip.hardEdge,
+                                        child: SizedBox(
+                                          width: _controller!.value.previewSize!.height,
+                                          height: _controller!.value.previewSize!.width,
+                                          child: CameraPreview(_controller!),
+                                        ),
                                       ),
-                                    ),
-                                ],
+                                      // Face detection overlay
+                                      if (_detectedFaces.isNotEmpty)
+                                        FaceOverlay(
+                                          faces: _detectedFaces,
+                                          imageSize: Size(
+                                            _controller!.value.previewSize!.height,
+                                            _controller!.value.previewSize!.width,
+                                          ),
+                                          widgetSize: Size(
+                                            constraints.maxWidth,
+                                            constraints.maxHeight,
+                                          ),
+                                          isFrontCamera: _cameras![_currentCameraIndex].lensDirection == CameraLensDirection.front,
+                                        ),
+                                      // Switch camera button overlay
+                                      if (_cameras != null && _cameras!.length > 1)
+                                        Positioned(
+                                          top: 16,
+                                          right: 16,
+                                          child: FloatingActionButton(
+                                            mini: true,
+                                            onPressed: _switchCamera,
+                                            backgroundColor: Colors.white.withValues(alpha: 0.8),
+                                            child: const Icon(Icons.flip_camera_ios),
+                                          ),
+                                        ),
+                                    ],
+                                  );
+                                },
                               ),
                             ),
                           )
@@ -347,6 +455,12 @@ class _CameraScreenState extends State<CameraScreen> {
                             ),
                           ),
                   ),
+                  // Face detection status indicator
+                  if (_controller != null && _controller!.value.isInitialized)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      child: _buildFaceStatusIndicator(),
+                    ),
                   // Capture button - same container height as preview buttons
                   if (_controller != null && _controller!.value.isInitialized)
                     SafeArea(
@@ -356,20 +470,23 @@ class _CameraScreenState extends State<CameraScreen> {
                           height: 56,
                           child: Center(
                             child: GestureDetector(
-                              onTap: _takePicture,
+                              onTap: _detectedFaces.isNotEmpty ? _takePicture : null,
                               child: Container(
                                 width: 56,
                                 height: 56,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  border: Border.all(color: Colors.white, width: 3),
+                                  border: Border.all(
+                                    color: _detectedFaces.isNotEmpty ? Colors.green : Colors.white54,
+                                    width: 3,
+                                  ),
                                 ),
                                 child: Padding(
                                   padding: const EdgeInsets.all(3.0),
                                   child: Container(
-                                    decoration: const BoxDecoration(
+                                    decoration: BoxDecoration(
                                       shape: BoxShape.circle,
-                                      color: Colors.white,
+                                      color: _detectedFaces.isNotEmpty ? Colors.green : Colors.white54,
                                     ),
                                   ),
                                 ),
