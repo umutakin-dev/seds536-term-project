@@ -32,6 +32,7 @@ ENV/
 training/checkpoints/
 training/runs/
 training/logs/
+training/data/
 *.h5
 *.pth
 *.onnx

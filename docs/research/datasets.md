@@ -317,3 +317,293 @@ After reviewing 7 major datasets, **Meta Casual Conversations v2** emerges as th
 - If CC v2 too large: Use STW (contact authors)
 - If need more data: Combine with FairFace (but re-annotate with Monk scale)
 - For pre-training: Could use FairFace then fine-tune on CC v2
+
+---
+
+## Dataset Investigation Log (January 2026)
+
+This section documents our hands-on investigation of dataset options for the SEDS536 term project.
+
+### Investigation Timeline
+
+**Date**: January 2, 2026  
+**Deadline**: January 6, 2026 (presentation)  
+**Goal**: Find a practical dataset for training a Monk scale skin tone classifier
+
+### Datasets Investigated
+
+#### 1. Meta Casual Conversations v2 - Access Granted ✅
+
+**Access Status**: Approved (same-day approval)  
+**Download Page**: https://ai.meta.com/datasets/casual-conversations-v2-dataset/
+
+**Actual Download Contents**:
+- `CCv2_annotations.zip` - Monk/Fitzpatrick annotations
+- `CCv2_samples.zip` - Sample subset
+- `CCv2_frames_part_1.zip` through `CCv2_frames_part_5.zip` - Pre-extracted frames
+- `CCv2_part_1.zip` through `CCv2_part_80.zip` - Full video dataset
+
+**Critical Finding**:
+- **80 video zip files**, each 30-60 GB = **2.4 - 4.8 TB total**
+- Far too large for a 4-day timeline
+- However, annotations and samples are manageable
+
+**Decision**: Download only `CCv2_annotations.zip` + `CCv2_samples.zip` for minimal viable approach.
+
+---
+
+#### 2. Google MST-E Dataset - Not Suitable ❌
+
+**URL**: https://skintone.google/mste-dataset  
+**Contents**: 1,515 images + 31 videos of 19 subjects across all 10 Monk tones
+
+**Critical Finding**:
+> **"The images cannot be used to train machine learning models"**
+
+The dataset is licensed **only for training human annotators**, not ML models. This makes it unsuitable for our use case despite being perfectly aligned with Monk scale.
+
+**Decision**: Cannot use for ML training. Could reference for scale understanding only.
+
+---
+
+#### 3. UTKFace Dataset - Limited Usefulness ⚠️
+
+**URL**: https://www.kaggle.com/datasets/jangedoo/utkface-new  
+**Size**: 20,000+ face images (~200MB)  
+**Labels**: Age, gender, ethnicity (5 classes: White, Black, Asian, Indian, Others)
+
+**Finding**:
+- Has **ethnicity labels**, not skin tone labels
+- Easy to download from Kaggle
+- Could compute ITA (Individual Typology Angle) values to approximate skin tone
+
+**Decision**: Not ideal - ethnicity ≠ skin tone. Could use as fallback with ITA computation.
+
+---
+
+#### 4. FFHQ (Flickr-Faces-HQ) - No Labels ❌
+
+**URL**: https://github.com/NVlabs/ffhq-dataset  
+**Size**: 70,000 high-quality faces  
+**Download**: 89GB for 1024x1024 images, 1.95GB for 128x128 thumbnails
+
+**Finding**:
+- **No skin tone labels** at all
+- Beautiful high-resolution images but requires manual annotation
+- Inherits Flickr's demographic biases
+
+**Decision**: Not suitable - no labels and too large for our timeline.
+
+---
+
+#### 5. SCIN Dataset - Wrong Domain ❌
+
+**URL**: https://github.com/google-research-datasets/scin  
+**Size**: 10,000+ images  
+**Labels**: Includes estimated Monk Skin Tone (eMST)
+
+**Finding**:
+- Has Monk scale labels ✅
+- But images are of **dermatology conditions** (skin diseases)
+- Not suitable for general face/skin tone detection
+
+**Decision**: Wrong domain - dermatology images, not face photos.
+
+---
+
+### Alternative Approaches Considered
+
+#### ITA-Based Approach (No Dataset Needed)
+
+**Method**: Individual Typology Angle calculation using LAB color space  
+**Formula**: `ITA = arctan((L* - 50) / b*) × 180/π`
+
+**Pros**:
+- No training data required
+- Scientifically validated in dermatology research
+- Can map ITA values to Monk scale using published thresholds
+- Works immediately on existing face extraction pipeline
+
+**Cons**:
+- Less accurate than ML approach
+- Sensitive to lighting conditions
+- Rule-based, not learned
+
+**Decision**: Keep as fallback option for demo if ML approach hits issues.
+
+---
+
+### Final Decision
+
+**Chosen Approach**: Meta Casual Conversations v2 (Minimal)
+
+**What to Download**:
+1. `CCv2_annotations.zip` - Contains Monk scale labels for all 26,467 videos
+2. `CCv2_samples.zip` - Sample subset for quick experimentation
+
+**Rationale**:
+1. **Has actual Monk scale annotations** - gold standard labels
+2. **Ethically sourced** - participant consent for ML fairness research
+3. **Manageable size** - annotations + samples are small downloads
+4. **Academic credibility** - published dataset from Meta AI
+5. **Already have access** - approved same-day
+
+**Training Strategy**:
+- Use sample subset for initial model development
+- If more data needed, can download 1-2 frame parts
+- Document full dataset access for future work
+
+**Fallback Plan**:
+- If samples insufficient: Implement ITA-based approach for demo
+- Mention ML approach as validated methodology in presentation
+- Show dataset access and research as evidence of thorough approach
+
+---
+
+### Lessons Learned
+
+1. **Dataset size matters** - TB-scale datasets not practical for short timelines
+2. **License restrictions vary** - MST-E looked perfect but can't be used for ML
+3. **Domain specificity** - SCIN has Monk labels but wrong image type
+4. **Access time** - Meta approved same-day, but others may take weeks
+5. **Annotations vs Images** - Sometimes annotations alone are valuable
+
+---
+
+### References
+
+- Meta Casual Conversations v2: https://ai.meta.com/datasets/casual-conversations-v2-dataset/
+- Google MST-E: https://skintone.google/mste-dataset
+- UTKFace: https://www.kaggle.com/datasets/jangedoo/utkface-new
+- FFHQ: https://github.com/NVlabs/ffhq-dataset
+- SCIN: https://github.com/google-research-datasets/scin
+
+---
+
+## Dataset Preparation Log (January 2, 2026)
+
+This section documents the actual dataset preparation work completed.
+
+### What We Actually Downloaded
+
+After initial analysis revealed the samples were insufficient (only 6 videos), we downloaded:
+
+| File | Size | Contents |
+|------|------|----------|
+| `CCv2_annotations.zip` | 11.7 MB | JSON annotations for all 26,467 videos |
+| `CCv2_frames_part_1.zip` | ~10 GB | Pre-extracted frames for subjects 0000-1113 |
+| `CCv2_frames_part_2.zip` | ~10 GB | Pre-extracted frames for subjects 1114-2227 |
+| `CCv2_frames_part_3.zip` | ~10 GB | Pre-extracted frames for subjects 2228-3340 |
+| `CCv2_frames_part_4.zip` | ~10 GB | Pre-extracted frames for subjects 3341-4453 |
+| `CCv2_frames_part_5.zip` | ~10 GB | Pre-extracted frames for subjects 4454-5566 |
+| **Total** | **~50 GB** | **264,670 frames from 5,567 subjects** |
+
+**Rationale for downloading all 5 parts**: The Monk scale distribution is heavily imbalanced, with rare tones (Scale 1, 9, 10) spread across different parts. Downloading only Part 1 would miss critical minority class samples.
+
+### Dataset Statistics
+
+#### Annotation Structure
+
+Each video annotation contains:
+```json
+{
+  "video_name": "0000_portuguese_nonscripted_1.mp4",
+  "subject_id": "0000",
+  "monk_skin_tone": {
+    "scale": "scale 5",
+    "confidence": "medium"
+  },
+  "fitzpatrick_skin_tone": {
+    "type": "type iii",
+    "confidence": "medium"
+  },
+  // ... additional metadata (age, gender, location, etc.)
+}
+```
+
+#### Frame Structure
+
+Frames are organized by subject ID:
+```
+ccv2-frames-part-1/
+├── 0000/
+│   ├── 0000_portuguese_nonscripted_1_raw_frame00000381.jpg
+│   ├── 0000_portuguese_nonscripted_1_raw_frame00000425.jpg
+│   └── ...
+├── 0001/
+└── ...
+```
+
+#### Monk Scale Distribution (All 5 Parts)
+
+| Scale | Subjects | Percentage | Notes |
+|-------|----------|------------|-------|
+| 1 | 30 | 0.5% | Very limited |
+| 2 | 300 | 5.4% | |
+| 3 | 747 | 13.4% | |
+| 4 | 962 | 17.3% | |
+| 5 | 2,502 | 44.9% | **Dominant class** |
+| 6 | 723 | 13.0% | |
+| 7 | 167 | 3.0% | |
+| 8 | 91 | 1.6% | |
+| 9 | 39 | 0.7% | Very limited |
+| 10 | 6 | 0.1% | **Extremely limited** |
+
+**Key Challenge**: Severe class imbalance - Scale 5 has 417x more subjects than Scale 10.
+
+#### Confidence Distribution
+
+| Confidence | Videos | Percentage |
+|------------|--------|------------|
+| High | 10,680 | 40.3% |
+| Medium | 13,385 | 50.6% |
+| Low | 2,402 | 9.1% |
+
+### Preprocessing Pipeline
+
+Created `training/scripts/preprocess_ccv2.py` with the following strategy:
+
+1. **Load annotations** from JSON
+2. **Filter by confidence** (keep high/medium only, ~91% of data)
+3. **Group by Monk scale** (1-10)
+4. **Split by subject** (not by frame) to prevent data leakage:
+   - Train: 70% of subjects
+   - Validation: 15% of subjects
+   - Test: 15% of subjects
+5. **Sample frames** (max 30 per subject to prevent dominance)
+6. **Copy to organized structure**:
+   ```
+   training/data/ccv2_balanced/
+   ├── train/
+   │   ├── scale_1/
+   │   ├── scale_2/
+   │   └── ... (scale_10/)
+   ├── val/
+   └── test/
+   ```
+
+### Environment Setup
+
+Created Python environment with uv:
+```bash
+uv venv --python 3.12
+uv pip install torch torchvision pillow pandas numpy scikit-learn tqdm
+```
+
+### Files Created
+
+| File | Purpose |
+|------|---------|
+| `training/scripts/preprocess_ccv2.py` | Dataset preprocessing pipeline |
+| `training/configs/` | (For training configuration) |
+| `training/notebooks/` | (For experimentation) |
+| `.venv/` | Python virtual environment |
+
+### Next Steps
+
+1. **Run preprocessing** - Execute `preprocess_ccv2.py` to create balanced dataset
+2. **Train classifier** - CNN model for 10-class Monk scale classification
+3. **Convert to TFLite** - For on-device inference in Flutter app
+4. **Integrate with app** - Connect model to existing face extraction pipeline
+
+---
