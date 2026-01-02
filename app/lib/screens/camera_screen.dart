@@ -326,29 +326,46 @@ class _CameraScreenState extends State<CameraScreen> {
     // If we have a captured image, show preview screen
     if (_capturedImage != null) {
       return Scaffold(
-        appBar: AppBar(
-          backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-          title: const Text('Preview'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.go('/'),
-          ),
-        ),
         body: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
               colors: [
                 Color(0xFF44475A), // Dracula background
-                Color(0xFF282A36), // Darker Dracula
+                Color(0xFF6272A4), // Dracula comment
               ],
             ),
           ),
-          child: Column(
-            children: [
-              // Image area - same padding as camera screen
-              Expanded(
+          child: SafeArea(
+            child: Column(
+              children: [
+                // Header
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back, color: Colors.white),
+                        onPressed: () => context.go('/'),
+                      ),
+                      const Expanded(
+                        child: Text(
+                          'Preview',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      const SizedBox(width: 48), // Balance the back button
+                    ],
+                  ),
+                ),
+                // Image area - same padding as camera screen
+                Expanded(
                 child: Padding(
                   padding: const EdgeInsets.all(8.0),
                   child: Transform.flip(
@@ -365,9 +382,8 @@ class _CameraScreenState extends State<CameraScreen> {
                   ),
                 ),
               ),
-              // Button area - same height as camera capture button area
-              SafeArea(
-                child: Container(
+                // Button area - same height as camera capture button area
+                Container(
                   padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 16.0),
                   child: Row(
                     children: [
@@ -408,8 +424,8 @@ class _CameraScreenState extends State<CameraScreen> {
                     ],
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       );
@@ -417,31 +433,48 @@ class _CameraScreenState extends State<CameraScreen> {
 
     // Otherwise show camera screen
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: const Text('Skin Tone Analyzer'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/'),
-        ),
-      ),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
             colors: [
               Color(0xFF44475A), // Dracula background
-              Color(0xFF282A36), // Darker Dracula
+              Color(0xFF6272A4), // Dracula comment
             ],
           ),
         ),
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator(color: Colors.white))
-            : Column(
-                children: [
-                  // Camera preview or status message
-                  Expanded(
+        child: SafeArea(
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator(color: Colors.white))
+              : Column(
+                  children: [
+                    // Header
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Row(
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.arrow_back, color: Colors.white),
+                            onPressed: () => context.go('/'),
+                          ),
+                          const Expanded(
+                            child: Text(
+                              'Skin Tone Analyzer',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          const SizedBox(width: 48), // Balance the back button
+                        ],
+                      ),
+                    ),
+                    // Camera preview or status message
+                    Expanded(
                     child: _controller != null && _controller!.value.isInitialized
                         ? Padding(
                             padding: const EdgeInsets.all(8.0),
@@ -523,10 +556,9 @@ class _CameraScreenState extends State<CameraScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 16.0),
                       child: _buildFaceStatusIndicator(),
                     ),
-                  // Capture button - same container height as preview buttons
-                  if (_controller != null && _controller!.value.isInitialized)
-                    SafeArea(
-                      child: Container(
+                    // Capture button - same container height as preview buttons
+                    if (_controller != null && _controller!.value.isInitialized)
+                      Container(
                         padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 16.0),
                         child: SizedBox(
                           height: 56,
@@ -557,9 +589,9 @@ class _CameraScreenState extends State<CameraScreen> {
                           ),
                         ),
                       ),
-                    ),
-                ],
-              ),
+                  ],
+                ),
+        ),
       ),
     );
   }
