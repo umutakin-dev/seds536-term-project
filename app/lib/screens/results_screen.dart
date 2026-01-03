@@ -102,16 +102,15 @@ class _ResultsScreenState extends State<ResultsScreen> {
                   ],
                 ),
               ),
-              // Content
+              // Content - fixed layout, no scrolling
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Extracted Face Image
+                      // Extracted Face Image - expands to fill available space
                       Expanded(
-                        flex: 4,
                         child: Container(
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(24),
@@ -130,26 +129,21 @@ class _ResultsScreenState extends State<ResultsScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      // Analysis Results
-                      Expanded(
-                        flex: 6,
-                        child: Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.95),
-                            borderRadius: BorderRadius.circular(24),
-                          ),
-                          child: _isLoading
-                              ? _buildLoadingState()
-                              : _errorMessage != null
-                                  ? _buildErrorState()
-                                  : SingleChildScrollView(
-                                      child: _buildResultsState(),
-                                    ),
+                      const SizedBox(height: 12),
+                      // Analysis Results - fits content only
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.95),
+                          borderRadius: BorderRadius.circular(24),
                         ),
+                        child: _isLoading
+                            ? _buildLoadingState()
+                            : _errorMessage != null
+                                ? _buildErrorState()
+                                : _buildResultsState(),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 12),
                     ],
                   ),
                 ),
@@ -162,9 +156,10 @@ class _ResultsScreenState extends State<ResultsScreen> {
   }
 
   Widget _buildLoadingState() {
-    return const Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: const [
+        SizedBox(height: 40),
         CircularProgressIndicator(
           color: Color(0xFFBD93F9),
         ),
@@ -190,8 +185,9 @@ class _ResultsScreenState extends State<ResultsScreen> {
 
   Widget _buildErrorState() {
     return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
       children: [
+        const SizedBox(height: 40),
         const Icon(
           Icons.error_outline,
           size: 64,
@@ -225,6 +221,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
     final result = _result!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
         // Header
         Row(
@@ -232,13 +229,13 @@ class _ResultsScreenState extends State<ResultsScreen> {
             const Icon(
               Icons.check_circle,
               color: Color(0xFF50FA7B), // Dracula green
-              size: 32,
+              size: 28,
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
             const Text(
               'Skin Tone Analysis',
               style: TextStyle(
-                fontSize: 20,
+                fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -246,45 +243,55 @@ class _ResultsScreenState extends State<ResultsScreen> {
             Text(
               '${result.inferenceTimeMs}ms',
               style: const TextStyle(
-                fontSize: 12,
+                fontSize: 11,
                 color: Colors.grey,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 24),
-        // Main result
-        _AnalysisItem(
-          label: 'Skin Tone',
-          value: result.className,
-          icon: Icons.palette_outlined,
+        const SizedBox(height: 12),
+        // Main results - horizontal layout
+        Row(
+          children: [
+            Expanded(
+              child: _CompactMetric(
+                label: 'Skin Tone',
+                value: result.className,
+                icon: Icons.palette_outlined,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _CompactMetric(
+                label: 'Monk Scale',
+                value: result.monkScaleRange,
+                icon: Icons.colorize_outlined,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _CompactMetric(
+                label: 'Confidence',
+                value: '${(result.confidence * 100).toStringAsFixed(0)}%',
+                icon: Icons.insights_outlined,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 16),
-        _AnalysisItem(
-          label: 'Monk Scale',
-          value: result.monkScaleRange,
-          icon: Icons.colorize_outlined,
-        ),
-        const SizedBox(height: 16),
-        _AnalysisItem(
-          label: 'Confidence',
-          value: '${(result.confidence * 100).toStringAsFixed(1)}%',
-          icon: Icons.insights_outlined,
-        ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 12),
         // Probability bars
         const Text(
           'All Probabilities',
           style: TextStyle(
-            fontSize: 14,
+            fontSize: 12,
             fontWeight: FontWeight.w600,
             color: Colors.grey,
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         ...result.allProbabilities.entries.map((entry) {
           return Padding(
-            padding: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.only(bottom: 4),
             child: _ProbabilityBar(
               label: entry.key,
               probability: entry.value,
@@ -292,26 +299,27 @@ class _ResultsScreenState extends State<ResultsScreen> {
             ),
           );
         }),
-        const SizedBox(height: 16),
+        const SizedBox(height: 8),
         // Info box
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
             color: const Color(0xFF50FA7B).withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
             children: [
               const Icon(
                 Icons.lightbulb_outline,
                 color: Color(0xFF50FA7B),
+                size: 18,
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'Monk Scale ${result.monkScaleRange}: ${_getScaleDescription(result.className)}',
                   style: const TextStyle(
-                    fontSize: 14,
+                    fontSize: 12,
                     color: Color(0xFF44475A),
                   ),
                 ),
@@ -337,12 +345,12 @@ class _ResultsScreenState extends State<ResultsScreen> {
   }
 }
 
-class _AnalysisItem extends StatelessWidget {
+class _CompactMetric extends StatelessWidget {
   final String label;
   final String value;
   final IconData icon;
 
-  const _AnalysisItem({
+  const _CompactMetric({
     required this.label,
     required this.value,
     required this.icon,
@@ -350,44 +358,38 @@ class _AnalysisItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: const Color(0xFFBD93F9).withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFBD93F9).withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
             icon,
             color: const Color(0xFFBD93F9),
-            size: 24,
+            size: 20,
           ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
+          const SizedBox(height: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 10,
+              color: Colors.grey,
+            ),
           ),
-        ),
-      ],
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -408,49 +410,49 @@ class _ProbabilityBar extends StatelessWidget {
     return Row(
       children: [
         SizedBox(
-          width: 60,
+          width: 55,
           child: Text(
             label,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 11,
               fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               color: isSelected ? const Color(0xFFBD93F9) : Colors.grey,
             ),
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 6),
         Expanded(
           child: Stack(
             children: [
               Container(
-                height: 20,
+                height: 16,
                 decoration: BoxDecoration(
                   color: Colors.grey.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(8),
                 ),
               ),
               FractionallySizedBox(
                 widthFactor: probability,
                 child: Container(
-                  height: 20,
+                  height: 16,
                   decoration: BoxDecoration(
                     color: isSelected
                         ? const Color(0xFFBD93F9)
                         : const Color(0xFF6272A4),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 6),
         SizedBox(
-          width: 50,
+          width: 45,
           child: Text(
             '${(probability * 100).toStringAsFixed(1)}%',
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 11,
               fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
             ),
             textAlign: TextAlign.right,
