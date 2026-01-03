@@ -601,9 +601,92 @@ uv pip install torch torchvision pillow pandas numpy scikit-learn tqdm
 
 ### Next Steps
 
-1. **Run preprocessing** - Execute `preprocess_ccv2.py` to create balanced dataset
-2. **Train classifier** - CNN model for 10-class Monk scale classification
-3. **Convert to TFLite** - For on-device inference in Flutter app
-4. **Integrate with app** - Connect model to existing face extraction pipeline
+1. ✅ **Run preprocessing** - Execute `preprocess_ccv2.py` to create balanced dataset
+2. ✅ **Train classifier** - CNN model for 10-class Monk scale classification (see [training-experiments.md](training-experiments.md))
+3. ✅ **Improve model** - 3-class grouping + face cropping → 78.6% accuracy (see [Experiment 2](training-experiments.md#experiment-2-3-class-with-face-cropped-images))
+4. **Convert to TFLite** - For on-device inference in Flutter app
+5. **Integrate with app** - Connect model to existing face extraction pipeline
+
+---
+
+## Preprocessing Results (January 3, 2026)
+
+The preprocessing pipeline completed successfully, creating the balanced dataset structure.
+
+### Output Location
+
+```
+training/data/ccv2_balanced/
+├── train/
+│   ├── scale_1/  ... scale_10/
+├── val/
+│   ├── scale_1/  ... scale_10/
+└── test/
+    ├── scale_1/  ... scale_10/
+```
+
+### Final Dataset Statistics
+
+**Total frames**: 149,520
+
+#### Training Set (104,510 frames)
+
+| Scale | Frames | % of Train |
+|-------|--------|------------|
+| 1 | 570 | 0.5% |
+| 2 | 5,520 | 5.3% |
+| 3 | 14,410 | 13.8% |
+| 4 | 17,870 | 17.1% |
+| 5 | 47,260 | 45.2% |
+| 6 | 13,230 | 12.7% |
+| 7 | 2,970 | 2.8% |
+| 8 | 1,850 | 1.8% |
+| 9 | 710 | 0.7% |
+| 10 | 120 | 0.1% |
+
+#### Validation Set (22,290 frames)
+
+| Scale | Frames | % of Val |
+|-------|--------|----------|
+| 1 | 120 | 0.5% |
+| 2 | 1,160 | 5.2% |
+| 3 | 3,090 | 13.9% |
+| 4 | 3,790 | 17.0% |
+| 5 | 10,090 | 45.3% |
+| 6 | 2,840 | 12.7% |
+| 7 | 620 | 2.8% |
+| 8 | 390 | 1.7% |
+| 9 | 150 | 0.7% |
+| 10 | 30 | 0.1% |
+
+#### Test Set (22,730 frames)
+
+| Scale | Frames | % of Test |
+|-------|--------|-----------|
+| 1 | 150 | 0.7% |
+| 2 | 1,230 | 5.4% |
+| 3 | 3,150 | 13.9% |
+| 4 | 3,860 | 17.0% |
+| 5 | 10,180 | 44.8% |
+| 6 | 2,850 | 12.5% |
+| 7 | 680 | 3.0% |
+| 8 | 420 | 1.8% |
+| 9 | 180 | 0.8% |
+| 10 | 30 | 0.1% |
+
+### Key Observations
+
+1. **Class imbalance persists**: Scale 5 dominates (~45%), scales 1, 9, 10 are rare (<1%)
+2. **Consistent distribution**: Train/val/test splits maintain similar proportions (good stratification)
+3. **Subject-level splitting**: Prevents data leakage between splits
+4. **Minority classes**: Scale 10 has only 30 samples in val/test - will need careful handling
+
+### Training Considerations
+
+Due to severe class imbalance, training will need:
+- **Weighted loss function**: Higher weights for minority classes (1, 9, 10)
+- **Oversampling**: Augment minority classes during training
+- **Evaluation metrics**: Focus on macro F1, per-class accuracy rather than overall accuracy
+- **Class grouping (optional)**: Consider grouping into 3-4 super-classes if 10-class performance is poor
 
 ---

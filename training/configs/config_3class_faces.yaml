@@ -1,0 +1,77 @@
+# Training configuration for 3-class Monk Skin Tone Classifier
+# Uses face-cropped images and grouped classes (Light/Medium/Dark)
+# Experiment 2: Addressing class imbalance from Experiment 1
+
+# Data paths - using face-cropped dataset
+data:
+  train_dir: "training/data/ccv2_faces/train"
+  val_dir: "training/data/ccv2_faces/val"
+  test_dir: "training/data/ccv2_faces/test"
+  num_classes: 3
+  class_grouping: "3class"  # Light (1-3), Medium (4-7), Dark (8-10)
+
+# Model configuration
+model:
+  architecture: "efficientnet_b0"
+  pretrained: true
+  dropout: 0.3
+
+# Training hyperparameters
+training:
+  batch_size: 32
+  num_epochs: 30
+  learning_rate: 0.001
+  weight_decay: 0.0001
+
+  # Learning rate scheduler
+  scheduler:
+    type: "cosine"
+
+  # Early stopping
+  early_stopping:
+    enabled: true
+    patience: 7
+    min_delta: 0.001
+
+  # Class imbalance handling
+  class_weights: "inverse_frequency"
+  use_oversampling: true
+
+# Data augmentation
+augmentation:
+  train:
+    resize: 256
+    crop_size: 224
+    horizontal_flip: true
+    rotation: 15
+    color_jitter:
+      brightness: 0.2
+      contrast: 0.2
+      saturation: 0.2
+      hue: 0.1
+    normalize:
+      mean: [0.485, 0.456, 0.406]
+      std: [0.229, 0.224, 0.225]
+
+  val:
+    resize: 256
+    crop_size: 224
+    normalize:
+      mean: [0.485, 0.456, 0.406]
+      std: [0.229, 0.224, 0.225]
+
+# Output configuration
+output:
+  checkpoint_dir: "training/checkpoints_3class"
+  log_dir: "training/logs"
+  save_best_only: true
+  save_frequency: 5
+
+# Hardware
+hardware:
+  device: "auto"
+  num_workers: 4
+  pin_memory: true
+
+# Reproducibility
+seed: 42

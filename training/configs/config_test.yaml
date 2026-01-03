@@ -1,0 +1,70 @@
+# Minimal test configuration - quick run to verify pipeline
+# Use this to check for errors before full training
+
+# Data paths
+data:
+  train_dir: "training/data/ccv2_balanced/train"
+  val_dir: "training/data/ccv2_balanced/val"
+  test_dir: "training/data/ccv2_balanced/test"
+  num_classes: 10
+
+# Model - use smallest/fastest option
+model:
+  architecture: "mobilenet_v3_small"
+  pretrained: true
+  dropout: 0.3
+
+# Minimal training settings
+training:
+  batch_size: 32
+  num_epochs: 2  # Just 2 epochs to test
+  max_batches_per_epoch: 50  # Limit batches for quick test (~2-3 min total)
+  learning_rate: 0.001
+  weight_decay: 0.0001
+
+  scheduler:
+    type: "cosine"
+
+  early_stopping:
+    enabled: false  # Disable for test run
+
+  class_weights: "inverse_frequency"
+  use_oversampling: true
+
+# Same augmentation
+augmentation:
+  train:
+    resize: 256
+    crop_size: 224
+    horizontal_flip: true
+    rotation: 15
+    color_jitter:
+      brightness: 0.2
+      contrast: 0.2
+      saturation: 0.2
+      hue: 0.1
+    normalize:
+      mean: [0.485, 0.456, 0.406]
+      std: [0.229, 0.224, 0.225]
+
+  val:
+    resize: 256
+    crop_size: 224
+    normalize:
+      mean: [0.485, 0.456, 0.406]
+      std: [0.229, 0.224, 0.225]
+
+# Output
+output:
+  checkpoint_dir: "training/checkpoints"
+  log_dir: "training/logs"
+  save_best_only: true
+  save_frequency: 1
+
+# Hardware
+hardware:
+  device: "auto"
+  num_workers: 2  # Fewer workers for test
+  pin_memory: true
+
+seed: 42
