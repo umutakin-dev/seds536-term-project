@@ -2,14 +2,64 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image/image.dart' as img;
+import '../services/skin_tone_classifier_service.dart';
 
-class ResultsScreen extends StatelessWidget {
+class ResultsScreen extends StatefulWidget {
   final String imagePath;
 
   const ResultsScreen({
     super.key,
     required this.imagePath,
   });
+
+  @override
+  State<ResultsScreen> createState() => _ResultsScreenState();
+}
+
+class _ResultsScreenState extends State<ResultsScreen> {
+  final SkinToneClassifierService _classifier = SkinToneClassifierService();
+  ClassificationResult? _result;
+  bool _isLoading = true;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _runClassification();
+  }
+
+  Future<void> _runClassification() async {
+    try {
+      // Load model
+      await _classifier.loadModel();
+
+      // Run classification
+      final result = await _classifier.classifyImage(widget.imagePath);
+
+      if (mounted) {
+        setState(() {
+          _result = result;
+          _isLoading = false;
+          if (result == null) {
+            _errorMessage = 'Classification failed. Please try again.';
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Error: $e';
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _classifier.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -59,7 +109,7 @@ class ResultsScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Extracted Face Image - full width, centered face with dominant color background
+                      // Extracted Face Image
                       Expanded(
                         flex: 4,
                         child: Container(
@@ -75,86 +125,28 @@ class ResultsScreen extends StatelessWidget {
                           ),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(24),
-                            child: _FaceImageWithBackground(imagePath: imagePath),
+                            child:
+                                _FaceImageWithBackground(imagePath: widget.imagePath),
                           ),
                         ),
                       ),
                       const SizedBox(height: 16),
-                      // Analysis Placeholder - takes 60% of available space
+                      // Analysis Results
                       Expanded(
                         flex: 6,
                         child: Container(
-                          padding: const EdgeInsets.all(24),
+                          padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
                             color: Colors.white.withValues(alpha: 0.95),
                             borderRadius: BorderRadius.circular(24),
                           ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Row(
-                                children: [
-                                  Icon(
-                                    Icons.science_outlined,
-                                    color: Color(0xFFBD93F9),
-                                    size: 32,
-                                  ),
-                                  SizedBox(width: 12),
-                                  Text(
-                                    'Skin Tone Analysis',
-                                    style: TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold,
+                          child: _isLoading
+                              ? _buildLoadingState()
+                              : _errorMessage != null
+                                  ? _buildErrorState()
+                                  : SingleChildScrollView(
+                                      child: _buildResultsState(),
                                     ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 24),
-                              _AnalysisItem(
-                                label: 'Monk Scale',
-                                value: 'Coming Soon',
-                                icon: Icons.palette_outlined,
-                              ),
-                              const SizedBox(height: 16),
-                              _AnalysisItem(
-                                label: 'Skin Tone',
-                                value: 'Analysis Pending',
-                                icon: Icons.colorize_outlined,
-                              ),
-                              const SizedBox(height: 16),
-                              _AnalysisItem(
-                                label: 'Undertone',
-                                value: 'Analysis Pending',
-                                icon: Icons.layers_outlined,
-                              ),
-                              const Spacer(),
-                              Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFBD93F9).withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                child: const Row(
-                                  children: [
-                                    Icon(
-                                      Icons.info_outline,
-                                      color: Color(0xFFBD93F9),
-                                    ),
-                                    SizedBox(width: 12),
-                                    Expanded(
-                                      child: Text(
-                                        'ML analysis will be implemented in future issues',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color: Color(0xFFBD93F9),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -167,6 +159,181 @@ class ResultsScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Widget _buildLoadingState() {
+    return const Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        CircularProgressIndicator(
+          color: Color(0xFFBD93F9),
+        ),
+        SizedBox(height: 24),
+        Text(
+          'Analyzing skin tone...',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        SizedBox(height: 8),
+        Text(
+          'This may take a moment',
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.grey,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Icon(
+          Icons.error_outline,
+          size: 64,
+          color: Colors.red,
+        ),
+        const SizedBox(height: 16),
+        Text(
+          _errorMessage!,
+          style: const TextStyle(
+            fontSize: 16,
+            color: Colors.red,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 24),
+        ElevatedButton(
+          onPressed: () {
+            setState(() {
+              _isLoading = true;
+              _errorMessage = null;
+            });
+            _runClassification();
+          },
+          child: const Text('Retry'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildResultsState() {
+    final result = _result!;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header
+        Row(
+          children: [
+            const Icon(
+              Icons.check_circle,
+              color: Color(0xFF50FA7B), // Dracula green
+              size: 32,
+            ),
+            const SizedBox(width: 12),
+            const Text(
+              'Skin Tone Analysis',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const Spacer(),
+            Text(
+              '${result.inferenceTimeMs}ms',
+              style: const TextStyle(
+                fontSize: 12,
+                color: Colors.grey,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        // Main result
+        _AnalysisItem(
+          label: 'Skin Tone',
+          value: result.className,
+          icon: Icons.palette_outlined,
+        ),
+        const SizedBox(height: 16),
+        _AnalysisItem(
+          label: 'Monk Scale',
+          value: result.monkScaleRange,
+          icon: Icons.colorize_outlined,
+        ),
+        const SizedBox(height: 16),
+        _AnalysisItem(
+          label: 'Confidence',
+          value: '${(result.confidence * 100).toStringAsFixed(1)}%',
+          icon: Icons.insights_outlined,
+        ),
+        const SizedBox(height: 24),
+        // Probability bars
+        const Text(
+          'All Probabilities',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey,
+          ),
+        ),
+        const SizedBox(height: 12),
+        ...result.allProbabilities.entries.map((entry) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: _ProbabilityBar(
+              label: entry.key,
+              probability: entry.value,
+              isSelected: entry.key == result.className,
+            ),
+          );
+        }),
+        const SizedBox(height: 16),
+        // Info box
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF50FA7B).withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.lightbulb_outline,
+                color: Color(0xFF50FA7B),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Monk Scale ${result.monkScaleRange}: ${_getScaleDescription(result.className)}',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF44475A),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _getScaleDescription(String className) {
+    switch (className) {
+      case 'Light':
+        return 'Fair to light skin tones';
+      case 'Medium':
+        return 'Medium to olive skin tones';
+      case 'Dark':
+        return 'Deep to rich skin tones';
+      default:
+        return '';
+    }
   }
 }
 
@@ -225,6 +392,75 @@ class _AnalysisItem extends StatelessWidget {
   }
 }
 
+class _ProbabilityBar extends StatelessWidget {
+  final String label;
+  final double probability;
+  final bool isSelected;
+
+  const _ProbabilityBar({
+    required this.label,
+    required this.probability,
+    required this.isSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 60,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              color: isSelected ? const Color(0xFFBD93F9) : Colors.grey,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Stack(
+            children: [
+              Container(
+                height: 20,
+                decoration: BoxDecoration(
+                  color: Colors.grey.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              FractionallySizedBox(
+                widthFactor: probability,
+                child: Container(
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? const Color(0xFFBD93F9)
+                        : const Color(0xFF6272A4),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        SizedBox(
+          width: 50,
+          child: Text(
+            '${(probability * 100).toStringAsFixed(1)}%',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            ),
+            textAlign: TextAlign.right,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 /// Widget that displays face image centered with dominant color as background
 class _FaceImageWithBackground extends StatefulWidget {
   final String imagePath;
@@ -232,7 +468,8 @@ class _FaceImageWithBackground extends StatefulWidget {
   const _FaceImageWithBackground({required this.imagePath});
 
   @override
-  State<_FaceImageWithBackground> createState() => _FaceImageWithBackgroundState();
+  State<_FaceImageWithBackground> createState() =>
+      _FaceImageWithBackgroundState();
 }
 
 class _FaceImageWithBackgroundState extends State<_FaceImageWithBackground> {
