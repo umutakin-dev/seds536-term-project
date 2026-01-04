@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'screens/home_screen.dart';
 import 'screens/camera_screen.dart';
 import 'screens/results_screen.dart';
+import 'screens/history_screen.dart';
+import 'screens/history_detail_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,6 +34,17 @@ final GoRouter _router = GoRouter(
         final extra = state.extra as Map<String, dynamic>?;
         final imagePath = extra?['imagePath'] as String? ?? '';
         return ResultsScreen(imagePath: imagePath);
+      },
+    ),
+    GoRoute(
+      path: '/history',
+      builder: (context, state) => const HistoryScreen(),
+    ),
+    GoRoute(
+      path: '/history/:id',
+      builder: (context, state) {
+        final id = int.tryParse(state.pathParameters['id'] ?? '') ?? 0;
+        return HistoryDetailScreen(historyId: id);
       },
     ),
   ],
