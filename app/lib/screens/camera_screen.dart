@@ -42,13 +42,13 @@ class _CameraScreenState extends State<CameraScreen> {
   Future<void> _initializeCamera() async {
     try {
       // Try to get available cameras directly - this will trigger permission request on iOS
-      print('Attempting to get available cameras...');
+      debugPrint('Attempting to get available cameras...');
       _cameras = await availableCameras();
-      print('Found ${_cameras!.length} cameras');
+      debugPrint('Found ${_cameras!.length} cameras');
 
       // Check permission status after attempting camera access
       _cameraPermissionStatus = await Permission.camera.status;
-      print('Camera permission status after access attempt: $_cameraPermissionStatus');
+      debugPrint('Camera permission status after access attempt: $_cameraPermissionStatus');
 
       if (_cameras == null || _cameras!.isEmpty) {
         setState(() {
@@ -119,9 +119,9 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   Future<void> _requestCameraPermission() async {
-    print('Requesting camera permission...');
+    debugPrint('Requesting camera permission...');
     final status = await Permission.camera.request();
-    print('Permission request result: $status');
+    debugPrint('Permission request result: $status');
 
     setState(() {
       _cameraPermissionStatus = status;
@@ -295,7 +295,7 @@ class _CameraScreenState extends State<CameraScreen> {
       color = Colors.green;
       icon = Icons.face;
     } else {
-      message = 'Multiple faces detected - position one person';
+      message = 'Multiple faces - show one person';
       color = Colors.orange;
       icon = Icons.people;
     }
@@ -312,9 +312,12 @@ class _CameraScreenState extends State<CameraScreen> {
         children: [
           Icon(icon, color: color, size: 20),
           const SizedBox(width: 8),
-          Text(
-            message,
-            style: TextStyle(color: color, fontWeight: FontWeight.w500),
+          Flexible(
+            child: Text(
+              message,
+              style: TextStyle(color: color, fontWeight: FontWeight.w500),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       ),
@@ -552,9 +555,11 @@ class _CameraScreenState extends State<CameraScreen> {
                   ),
                   // Face detection status indicator
                   if (_controller != null && _controller!.value.isInitialized)
-                    Container(
+                    Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                      child: _buildFaceStatusIndicator(),
+                      child: Center(
+                        child: _buildFaceStatusIndicator(),
+                      ),
                     ),
                     // Capture button - same container height as preview buttons
                     if (_controller != null && _controller!.value.isInitialized)
