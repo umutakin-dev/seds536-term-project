@@ -16,6 +16,7 @@ dependencies = [
 
     # Image processing
     "opencv-python>=4.8.0",
+    "mediapipe>=0.10.0",
 
     # Configuration
     "pyyaml>=6.0",
