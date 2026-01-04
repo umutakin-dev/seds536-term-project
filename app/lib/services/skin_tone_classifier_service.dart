@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
 import 'package:tflite_flutter/tflite_flutter.dart';
 
@@ -55,11 +56,11 @@ class SkinToneClassifierService {
     try {
       _interpreter = await Interpreter.fromAsset(_modelPath);
       _isInitialized = true;
-      print('SkinToneClassifier: Model loaded successfully');
-      print('  Input shape: ${_interpreter!.getInputTensor(0).shape}');
-      print('  Output shape: ${_interpreter!.getOutputTensor(0).shape}');
+      debugPrint('SkinToneClassifier: Model loaded successfully');
+      debugPrint('  Input shape: ${_interpreter!.getInputTensor(0).shape}');
+      debugPrint('  Output shape: ${_interpreter!.getOutputTensor(0).shape}');
     } catch (e) {
-      print('SkinToneClassifier: Failed to load model: $e');
+      debugPrint('SkinToneClassifier: Failed to load model: $e');
       rethrow;
     }
   }
@@ -69,7 +70,7 @@ class SkinToneClassifierService {
   /// Returns null if classification fails
   Future<ClassificationResult?> classifyImage(String imagePath) async {
     if (!_isInitialized || _interpreter == null) {
-      print('SkinToneClassifier: Model not initialized');
+      debugPrint('SkinToneClassifier: Model not initialized');
       return null;
     }
 
@@ -79,7 +80,7 @@ class SkinToneClassifierService {
       // Load and preprocess image
       final input = await _preprocessImage(imagePath);
       if (input == null) {
-        print('SkinToneClassifier: Failed to preprocess image');
+        debugPrint('SkinToneClassifier: Failed to preprocess image');
         return null;
       }
 
@@ -121,7 +122,7 @@ class SkinToneClassifierService {
         inferenceTimeMs: inferenceTime,
       );
     } catch (e) {
-      print('SkinToneClassifier: Classification failed: $e');
+      debugPrint('SkinToneClassifier: Classification failed: $e');
       return null;
     }
   }
@@ -194,7 +195,7 @@ class SkinToneClassifierService {
 
       return input;
     } catch (e) {
-      print('SkinToneClassifier: Image preprocessing failed: $e');
+      debugPrint('SkinToneClassifier: Image preprocessing failed: $e');
       return null;
     }
   }
