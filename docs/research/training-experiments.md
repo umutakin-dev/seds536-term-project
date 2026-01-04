@@ -333,15 +333,31 @@ Dark             73     290   267
 
 ## Summary: Experiment Comparison
 
-| Metric | Exp 1 (10-class) | Exp 2 (3-class) |
-|--------|-----------------|-----------------|
-| Test Accuracy | 38.7% | **78.6%** |
-| Macro F1 | 0.230 | **0.625** |
-| Training Time | 6.2 hr | **2.4 hr** |
-| Worst Class | 0.0% | **42.4%** |
-| Fairness | FAIL | FAIL (improved) |
+| Metric | Exp 1 (10-class) | Exp 2 (3-class) | Exp 3 (ITA Raw) | Exp 3b (Color) | Exp 3c (Oval) | Exp 3d (Small Oval) |
+|--------|------------------|-----------------|-----------------|----------------|---------------|---------------------|
+| Test Accuracy | 38.7% | **78.6%** | 19.3% | 52.3% | 52.2% | 52.3% |
+| Macro F1 | 0.230 | **0.625** | 0.188 | 0.337 | 0.343 | 0.358 |
+| Training Time | 6.2 hr | 2.4 hr | **0 hr** | **0 hr** | **0 hr** | **0 hr** |
+| Preprocessing | None | Face crop | None | Skin mask | Oval 0.7×0.85 | Oval 0.5×0.7 |
+| Skin Ratio | N/A | N/A | N/A | 55.1% | 34.2% | 22.8% |
+| Method | CNN | CNN | Classical | Classical | Classical | Classical |
 
-**Recommendation**: Use Experiment 2 model (3-class) for the demo application.
+**Key Findings**:
+1. **CNN (3-class) is best**: 78.6% accuracy, learns features automatically
+2. **ITA raw fails**: 19.3% - literature thresholds don't match real-world data
+3. **ITA + preprocessing + tuning**: ~52% ceiling regardless of segmentation method
+4. **Segmentation method doesn't matter**: Color-only ≈ Oval+color ≈ Small oval (all ~52%)
+5. **ITA is the bottleneck**: High variance (std 37-42°), overlapping distributions
+6. **Accuracy-fairness tradeoff**: Can push to 69% with extreme thresholds but Dark class dies (1% recall)
+
+**Classical Techniques Demonstrated** (for SEDS536 course):
+- Color space conversion (RGB → YCbCr, RGB → LAB)
+- Thresholding for skin segmentation
+- Morphological operations (erosion, dilation)
+- Geometric masking (ellipse/oval)
+- Grid search optimization
+
+**Recommendation**: Use Experiment 2 model (3-class CNN) for production. ITA serves as educational baseline.
 
 ---
 
@@ -430,6 +446,490 @@ def predict_with_confidence(model, image, threshold=0.7):
 2. Confidence thresholding (quick win, improves UX)
 3. Focal loss experiment (medium effort, may improve fairness)
 4. Additional data/augmentation (if time permits)
+
+---
+
+## Experiment 3: ITA Baseline (Classical Method)
+
+**Date**: January 4, 2026
+**Duration**: ~4.5 minutes (inference only, no training)
+**Status**: Completed
+
+### Objective
+
+Implement Individual Typology Angle (ITA) as a classical baseline for skin tone classification, comparing against the CNN approach.
+
+### Background: What is ITA?
+
+ITA is a dermatology standard for measuring skin color objectively using the LAB color space:
+
+```
+ITA = arctan((L* - 50) / b*) × (180/π)
+```
+
+Where:
+- **L*** = Lightness (0-100)
+- **b*** = Blue-Yellow axis (skin has yellow/warm undertones)
+
+**Standard ITA Thresholds** (from literature):
+| ITA Range | Skin Tone | Our 3-Class |
+|-----------|-----------|-------------|
+| > 55° | Very Light | Light |
+| 41°-55° | Light | Light |
+| 28°-41° | Intermediate | Medium |
+| 10°-28° | Tan | Medium |
+| < 10° | Dark | Dark |
+
+### Configuration
+
+```yaml
+Method: ITA (Individual Typology Angle)
+Color Space: CIE LAB
+Thresholds:
+  Light: ITA > 41°
+  Medium: 10° ≤ ITA ≤ 41°
+  Dark: ITA < 10°
+Preprocessing: None (raw face crops)
+Skin Segmentation: None
+```
+
+### Results
+
+#### Overall Metrics
+
+| Metric | ITA Baseline | CNN (Exp 2) | Difference |
+|--------|-------------|-------------|------------|
+| Test Accuracy | **19.3%** | 78.6% | -59.3% |
+| Macro F1 | 0.188 | 0.625 | -0.437 |
+| Weighted F1 | 0.243 | 0.790 | -0.547 |
+
+#### Per-Class Performance
+
+| Class | Precision | Recall | F1 | Accuracy | Support |
+|-------|-----------|--------|-----|----------|---------|
+| Light | 0.227 | 0.325 | 0.268 | 32.5% | 4,530 |
+| Medium | 0.721 | 0.146 | 0.243 | 14.6% | 17,570 |
+| Dark | 0.027 | 0.548 | 0.052 | 54.8% | 630 |
+
+#### Confusion Matrix
+
+```
+Pred →    Light     Medium    Dark
+Light     1473      886       2171
+Medium    4833      2574      10163
+Dark      173       112       345
+```
+
+#### ITA Statistics by Ground Truth Class
+
+| Class | Mean ITA | Std Dev | Min | Max |
+|-------|----------|---------|-----|-----|
+| Light | 7.3° | 51.6° | -90° | 90° |
+| Medium | -5.1° | 56.4° | -90° | 90° |
+| Dark | 0.0° | 54.3° | -90° | 90° |
+
+### Analysis
+
+#### Why ITA Failed
+
+1. **No skin segmentation**: ITA computed over entire face crop (hair, eyes, lips, background)
+2. **High variance**: All classes have ITA std dev > 50° (essentially random)
+3. **Overlapping distributions**: Class means are nearly identical (7.3°, -5.1°, 0.0°)
+4. **Lighting variation**: Different white balance shifts LAB values unpredictably
+
+#### Key Insight
+
+The CNN (78.6%) dramatically outperforms ITA (19.3%) on the same data because:
+- CNN **learns** to focus on relevant skin regions
+- CNN **learns** lighting invariance from augmented training data
+- ITA needs **explicit preprocessing** (skin segmentation, lighting normalization)
+
+#### Academic Value
+
+This result demonstrates:
+1. Why deep learning has replaced classical methods for many vision tasks
+2. The importance of preprocessing for classical approaches
+3. A fair baseline comparison for the course presentation
+
+### Artifacts
+
+| File | Description |
+|------|-------------|
+| `training/scripts/ita_baseline.py` | ITA implementation script |
+| `training/results_ita_baseline.json` | Detailed results |
+
+### Next Steps: Improving ITA
+
+To make ITA competitive, consider:
+
+1. **Skin segmentation** (Priority 1) ✅ DONE
+   - Use color thresholding in YCbCr space
+   - Apply morphological cleanup
+   - Calculate ITA only on skin pixels
+
+2. **Threshold tuning** ✅ DONE
+   - Grid search on validation set
+   - Dataset-specific thresholds
+
+3. **ROI selection** (Optional)
+   - Extract forehead/cheek regions only
+   - Avoid eyes, lips, hair
+
+4. **Lighting normalization** (Optional)
+   - CLAHE on L channel before ITA
+   - White balance correction
+
+---
+
+## Experiment 3b: ITA with Skin Segmentation + Tuned Thresholds
+
+**Date**: January 4, 2026
+**Duration**: ~15 minutes (preprocessing) + ~2 minutes (evaluation)
+**Status**: Completed
+
+### Objective
+
+Improve ITA baseline by:
+1. Adding skin segmentation (YCbCr color thresholding + morphological cleanup)
+2. Tuning ITA thresholds on validation set
+
+### Preprocessing Pipeline
+
+Classical image processing techniques applied:
+
+```
+Face Image → RGB to YCbCr → Threshold Skin → Morphological Cleanup → Skin Mask
+                              (Cb: 77-127)      (Open + Close)
+                              (Cr: 133-173)
+```
+
+**Preprocessing Statistics** (149,520 images):
+- Mean skin ratio: 55.1%
+- Processing time: ~13 minutes (12 workers)
+- Output: `ccv2_faces_preprocessed/` with `_masked.jpg` and `_mask.png` per image
+
+### Configuration
+
+```yaml
+Method: ITA with Skin Segmentation
+Skin Detection: YCbCr color thresholding
+  Cb_range: [77, 127]
+  Cr_range: [133, 173]
+Morphological Cleanup: Opening + Closing (5x5 ellipse kernel)
+Threshold Tuning: Grid search on validation set
+  Light range: [-30°, 30°] step 5°
+  Dark range: [-50°, 0°] step 5°
+```
+
+### Results
+
+#### Threshold Tuning (Validation Set)
+
+| Thresholds | Source | Val Accuracy |
+|------------|--------|--------------|
+| Light > 41°, Dark < 10° | Literature | ~19% |
+| Light > 25°, Dark < -50° | **Tuned** | **51.5%** |
+
+**Key insight**: Literature thresholds assume controlled lighting. Real-world data has much lower ITA values.
+
+#### Test Set Performance
+
+| Metric | Exp 3 (Raw ITA) | Exp 3b (Tuned) | Improvement |
+|--------|-----------------|----------------|-------------|
+| Test Accuracy | 19.3% | **52.3%** | **+33.0%** |
+| Macro F1 | 0.188 | **0.337** | **+0.149** |
+| Weighted F1 | 0.243 | **0.578** | **+0.335** |
+
+#### Per-Class Performance
+
+| Class | Precision | Recall | F1 | Support |
+|-------|-----------|--------|-----|---------|
+| Light | 0.300 | 0.284 | 0.292 | 4,530 |
+| Medium | 0.768 | 0.596 | 0.671 | 17,570 |
+| Dark | 0.028 | 0.213 | 0.049 | 630 |
+
+#### Confusion Matrix
+
+```
+Pred →    Light     Medium    Dark
+Light     1288      2822      420
+Medium    2852      10470     4248
+Dark      157       339       134
+```
+
+### Analysis
+
+#### What Worked
+1. **Skin segmentation reduced variance**: ITA std dev dropped from 51-56° to 36-41°
+2. **Threshold tuning was critical**: 19% → 52% accuracy
+3. **Medium class performs well**: 59.6% recall (majority class)
+
+#### What Didn't Work
+1. **Dark class still struggles**: Only 21.3% recall (limited samples, high variance)
+2. **Light/Medium confusion**: Many Light samples classified as Medium
+3. **ITA distributions still overlap**: Even with skin-only pixels
+
+#### Classical Techniques Demonstrated
+
+| Technique | Course Topic | Implementation |
+|-----------|--------------|----------------|
+| RGB → YCbCr | Color spaces | `skin_segmentation.py` |
+| Thresholding | Segmentation | Skin pixel detection |
+| Erosion/Dilation | Morphology | Mask cleanup |
+| RGB → LAB | Color spaces | ITA calculation |
+| Grid search | Optimization | Threshold tuning |
+
+### Artifacts
+
+| File | Description |
+|------|-------------|
+| `training/scripts/skin_segmentation.py` | Skin segmentation module |
+| `training/scripts/preprocess_skin.py` | Batch preprocessing script |
+| `training/scripts/ita_baseline.py` | Updated with `--use-preprocessed`, `--tune`, `--workers` |
+| `training/data/ccv2_faces_preprocessed/` | Preprocessed dataset |
+| `training/results_ita_preprocessed.json` | Detailed results |
+
+---
+
+## Experiment 3c: ITA with Face Oval + Color Segmentation
+
+**Date**: January 4, 2026
+**Duration**: ~12 minutes (preprocessing) + ~2 minutes (evaluation)
+**Status**: Completed
+
+### Objective
+
+Test whether combining a face oval mask with color-based skin segmentation improves ITA accuracy. The hypothesis was that:
+1. Oval restricts detection to face region (excludes hair, background)
+2. Color filtering within oval excludes non-skin areas (eyes, lips)
+
+### Preprocessing Pipeline
+
+```
+Face Image → Create Oval Mask → YCbCr Skin Detection → Intersection → Final Mask
+               (70% x 85%)        (same as 3b)          (both must match)
+```
+
+**Oval Parameters** (defaults from `segment_skin_with_oval`):
+- width_ratio: 0.7 (70% of image width)
+- height_ratio: 0.85 (85% of image height)
+- center_y_offset: -0.05 (5% above center)
+
+**Preprocessing Statistics** (149,520 images):
+- Mean skin ratio: 34.2% (vs 55.1% in Exp 3b)
+- Processing time: ~12 minutes (12 workers)
+- Output: `ccv2_faces_preprocessed_v3/`
+
+### Results
+
+#### Threshold Tuning (Validation Set)
+
+| Thresholds | Val Accuracy |
+|------------|--------------|
+| Light > 25°, Dark < -50° | **52.2%** |
+
+Same optimal thresholds as Exp 3b.
+
+#### Test Set Performance
+
+| Metric | Exp 3b (Color Only) | Exp 3c (Oval+Color) | Change |
+|--------|---------------------|---------------------|--------|
+| Test Accuracy | 52.3% | **52.2%** | -0.1% |
+| Macro F1 | 0.337 | **0.343** | +0.006 |
+| Weighted F1 | 0.578 | **0.580** | +0.002 |
+| Skin Ratio | 55.1% | **34.2%** | -20.9% |
+
+#### Per-Class Performance
+
+| Class | Precision | Recall | F1 | Support |
+|-------|-----------|--------|-----|---------|
+| Light | 0.320 | 0.298 | 0.308 | 4,530 |
+| Medium | 0.771 | 0.590 | 0.668 | 17,570 |
+| Dark | 0.029 | 0.230 | 0.051 | 630 |
+
+#### Confusion Matrix
+
+```
+Pred →    Light     Medium    Dark
+Light     1348      2728      454
+Medium    2741      10370     4459
+Dark      128       357       145
+```
+
+#### ITA Statistics by Class
+
+| Class | Mean ITA | Std Dev | Range |
+|-------|----------|---------|-------|
+| Light | 3.8° | 37.6° | [-90°, 90°] |
+| Medium | -18.3° | 40.0° | [-90°, 90°] |
+| Dark | -13.8° | 42.7° | [-90°, 90°] |
+
+### Analysis
+
+#### Key Finding: Oval Didn't Help Accuracy
+
+Despite reducing skin ratio from 55% to 34% (more focused mask), accuracy remained essentially identical (52.2% vs 52.3%).
+
+**Why?**
+1. **ITA is the bottleneck**: Even with perfect segmentation, ITA distributions overlap significantly
+2. **Standard deviations still high**: 37-42° across all classes (vs 36-41° in Exp 3b)
+3. **Class means poorly separated**: Light=3.8°, Medium=-18.3°, Dark=-13.8°
+
+#### Conclusion
+
+The segmentation method matters less than the fundamental ITA formula. The CNN's 78.6% accuracy represents what's achievable with learned features versus the ~52% ceiling of classical ITA-based classification.
+
+### Artifacts
+
+| File | Description |
+|------|-------------|
+| `training/data/ccv2_faces_preprocessed_v3/` | Oval+color preprocessed dataset |
+| `training/scripts/skin_segmentation.py` | `segment_skin_with_oval()` function |
+| `training/results_ita_preprocessed.json` | Results (overwritten) |
+
+---
+
+## Experiment 3d: Smaller Oval + Threshold Tuning
+
+**Date**: January 5, 2026
+**Duration**: ~12 minutes (preprocessing) + ~5 minutes (threshold experiments)
+**Status**: Completed
+
+### Objective
+
+1. Test smaller oval mask (0.5 × 0.7) to focus on cheeks/forehead
+2. Explore threshold tuning to find optimal accuracy-fairness balance
+
+### Preprocessing: Smaller Oval
+
+**Oval Parameters**:
+- width_ratio: 0.5 (vs 0.7 in v3)
+- height_ratio: 0.7 (vs 0.85 in v3)
+
+**Results**:
+- Mean skin ratio: 22.8% (vs 34.2% in v3)
+- Tighter mask focusing on central face region
+
+### Threshold Experiments
+
+Tested multiple threshold combinations on the smaller oval (v4) data:
+
+| Thresholds (Light, Dark) | Val Acc | Test Acc | Light Recall | Medium Recall | Dark Recall | Macro F1 |
+|--------------------------|---------|----------|--------------|---------------|-------------|----------|
+| > 25°, < -50° (baseline) | 52.9% | 52.3% | 38.9% | 56.8% | 23.3% | 0.358 |
+| > 33°, < -60° | 59.2% | 58.8% | 30.4% | 67.6% | 16.8% | 0.367 |
+| > 35°, < -80° (extreme) | 70.0% | 69.2% | 28.4% | 82.1% | 1.3% | 0.378 |
+
+### Analysis
+
+#### Key Finding: Accuracy-Fairness Tradeoff
+
+As thresholds become more extreme:
+- **Accuracy increases** (52% → 69%) by classifying more samples as Medium
+- **Dark class collapses** (23% → 1% recall)
+- **Light class suffers** (39% → 28% recall)
+
+This is a classic "majority class takeover" - the model games accuracy by predicting Medium (77% of data) for almost everything.
+
+#### Recommendation for Production
+
+**Use balanced thresholds (25°, -50°)** for a real skincare app:
+- More equitable across skin tones
+- Avoids telling dark-skinned users they're "medium"
+- Fairness > raw accuracy for this use case
+
+### ITA Distribution Analysis
+
+Even with optimized segmentation, ITA distributions overlap significantly:
+
+| Class | Mean ITA | Std Dev | Range |
+|-------|----------|---------|-------|
+| Light | 9.7° | 39.1° | [-90°, 90°] |
+| Medium | -13.9° | 41.7° | [-90°, 90°] |
+| Dark | -11.9° | 42.5° | [-90°, 90°] |
+
+**Problem**: Dark mean (-11.9°) is actually higher than Medium mean (-13.9°)! The distributions are essentially indistinguishable, making reliable classification impossible with ITA alone.
+
+### Artifacts
+
+| File | Description |
+|------|-------------|
+| `training/data/ccv2_faces_preprocessed_v4/` | Small oval preprocessed dataset |
+| `training/scripts/ita_baseline.py` | Updated with `--light-range`, `--dark-range` |
+
+---
+
+## Classical Methods: Final Conclusions
+
+### Summary Table
+
+| Experiment | Method | Accuracy | Macro F1 | Notes |
+|------------|--------|----------|----------|-------|
+| Exp 3 | ITA raw | 19.3% | 0.188 | Literature thresholds fail |
+| Exp 3b | ITA + color mask | 52.3% | 0.337 | YCbCr segmentation |
+| Exp 3c | ITA + oval+color (0.7×0.85) | 52.2% | 0.343 | Larger oval |
+| Exp 3d | ITA + oval+color (0.5×0.7) | 52.3% | 0.358 | Smaller oval |
+| Exp 3d | ITA + extreme thresholds | 69.2% | 0.378 | Unfair to minorities |
+| **Exp 2** | **CNN (3-class)** | **78.6%** | **0.625** | **Best overall** |
+
+### ITA in Literature vs Our Results
+
+Recent research shows ITA **can** achieve high accuracy under the right conditions:
+
+| Study | Method | Accuracy | Balanced Acc |
+|-------|--------|----------|--------------|
+| [Nature 2025](https://pmc.ncbi.nlm.nih.gov/articles/PMC12179258/) | ITA + DensePose + OpenFace | 89-92% | 58-75% |
+| [Nature 2025](https://pmc.ncbi.nlm.nih.gov/articles/PMC12179258/) | ITA → Fitzpatrick | 0.5-20% | 17-65% |
+| **Our study** | ITA + Haar Cascade + YCbCr | **52%** | ~35% |
+
+**Why the gap?**
+
+The literature's 89-92% used:
+- **DensePose/OpenFace** for face detection (vs our Haar Cascade)
+- **Clinical-quality images** with controlled lighting
+- **Direct ITA → Monk mapping** (not threshold-based classification)
+
+ITA was originally designed for **colorimeter measurements** in dermatology labs, not smartphone photos. Key limitations from literature:
+- "Sensitive to illuminants" - lighting variation degrades accuracy
+- "Less stable at higher melanin levels"
+- Per-class accuracy varies **0% to 99.66%** even in best conditions
+
+**Potential improvement**: Better face detection (MediaPipe, MTCNN, or RetinaFace) could significantly improve our results. See [Issue #33](https://github.com/umutakin-dev/seds536-term-project/issues/33).
+
+### Why Our ITA Implementation Underperforms
+
+1. **Poor face detection**: Haar Cascade produces noisy crops with hair/background
+2. **Uncontrolled lighting**: CCv2 dataset has variable smartphone lighting
+3. **No calibration**: Cannot calibrate ITA without reference color patches
+4. **Threshold-based**: Binary thresholds lose information vs learned mappings
+
+### Classical Techniques Demonstrated (SEDS536)
+
+| Technique | Implementation |
+|-----------|---------------|
+| Color space conversion | RGB → YCbCr, RGB → LAB |
+| Thresholding | Skin pixel detection |
+| Morphological operations | Opening, closing (5×5 ellipse) |
+| Geometric masking | Face oval creation |
+| Grid search optimization | Threshold tuning |
+
+### Final Recommendation
+
+**Use CNN (Experiment 2)** for production:
+- 78.6% accuracy vs ~52% for ITA
+- Better fairness across skin tones
+- Learned features handle lighting variation
+- Already converted to TFLite for mobile deployment
+
+ITA serves as an educational baseline demonstrating why deep learning has replaced classical methods for many vision tasks.
+
+### Known Data Quality Issues
+
+**Face Detection Quality** (tracked in [Issue #33](https://github.com/umutakin-dev/seds536-term-project/issues/33)):
+- Some face crops from Haar Cascade detector are poor quality
+- Issues include: partial faces, off-center crops, excessive background/hair
+- This contributes to high ITA variance even with good segmentation
+- Future work: implement quality filtering or use better detector (MTCNN, MediaPipe)
 
 ---
 
