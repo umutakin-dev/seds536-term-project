@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image/image.dart' as img;
 import '../services/skin_tone_classifier_service.dart';
+import '../widgets/recommendations_sheet.dart';
 
 class ResultsScreen extends StatefulWidget {
   final String imagePath;
@@ -300,49 +301,29 @@ class _ResultsScreenState extends State<ResultsScreen> {
           );
         }),
         const SizedBox(height: 8),
-        // Info box
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
-            color: const Color(0xFF50FA7B).withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
-              const Icon(
-                Icons.lightbulb_outline,
-                color: Color(0xFF50FA7B),
-                size: 18,
+        // Recommendations button
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () {
+              RecommendationsSheet.show(context, result.className);
+            },
+            icon: const Icon(Icons.spa_outlined, size: 18),
+            label: const Text('View Skincare Tips'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFBD93F9),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Monk Scale ${result.monkScaleRange}: ${_getScaleDescription(result.className)}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF44475A),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ],
     );
   }
 
-  String _getScaleDescription(String className) {
-    switch (className) {
-      case 'Light':
-        return 'Fair to light skin tones';
-      case 'Medium':
-        return 'Medium to olive skin tones';
-      case 'Dark':
-        return 'Deep to rich skin tones';
-      default:
-        return '';
-    }
-  }
 }
 
 class _CompactMetric extends StatelessWidget {
