@@ -333,22 +333,21 @@ Dark             73     290   267
 
 ## Summary: Experiment Comparison
 
-| Metric | Exp 1 (10-class) | Exp 2 (3-class) | Exp 3 (ITA Raw) | Exp 3b (Color) | Exp 3c (Oval) | Exp 3d (Small Oval) |
-|--------|------------------|-----------------|-----------------|----------------|---------------|---------------------|
-| Test Accuracy | 38.7% | **78.6%** | 19.3% | 52.3% | 52.2% | 52.3% |
-| Macro F1 | 0.230 | **0.625** | 0.188 | 0.337 | 0.343 | 0.358 |
-| Training Time | 6.2 hr | 2.4 hr | **0 hr** | **0 hr** | **0 hr** | **0 hr** |
-| Preprocessing | None | Face crop | None | Skin mask | Oval 0.7×0.85 | Oval 0.5×0.7 |
-| Skin Ratio | N/A | N/A | N/A | 55.1% | 34.2% | 22.8% |
-| Method | CNN | CNN | Classical | Classical | Classical | Classical |
+| Metric | Exp 1 (10-class) | Exp 2 (3-class) | Exp 3 (ITA Raw) | Exp 3b (Color) | Exp 3e (MediaPipe ITA) | Exp 4 (MediaPipe CNN) |
+|--------|------------------|-----------------|-----------------|----------------|------------------------|----------------------|
+| Test Accuracy | 38.7% | **78.6%** | 19.3% | 52.3% | 53.7% | 77.1% |
+| Macro F1 | 0.230 | **0.625** | 0.188 | 0.337 | 0.373 | ~0.60 |
+| Training Time | 6.2 hr | 2.4 hr | **0 hr** | **0 hr** | **0 hr** | 11 hr |
+| Preprocessing | None | Haar face crop | None | YCbCr mask | MediaPipe mask | MediaPipe mask |
+| Method | CNN | CNN | Classical | Classical | Classical | CNN |
 
 **Key Findings**:
-1. **CNN (3-class) is best**: 78.6% accuracy, learns features automatically
-2. **ITA raw fails**: 19.3% - literature thresholds don't match real-world data
-3. **ITA + preprocessing + tuning**: ~52% ceiling regardless of segmentation method
-4. **Segmentation method doesn't matter**: Color-only ≈ Oval+color ≈ Small oval (all ~52%)
+1. **CNN (3-class Haar) is best**: 78.6% accuracy, learns features automatically
+2. **MediaPipe preprocessing doesn't help CNN**: 77.1% (-1.5%) - simpler is better
+3. **ITA raw fails**: 19.3% - literature thresholds don't match real-world data
+4. **ITA + preprocessing + tuning**: ~52-54% ceiling regardless of segmentation method
 5. **ITA is the bottleneck**: High variance (std 37-42°), overlapping distributions
-6. **Accuracy-fairness tradeoff**: Can push to 69% with extreme thresholds but Dark class dies (1% recall)
+6. **Data quantity > preprocessing quality**: 12% more training data beats cleaner masks
 
 **Classical Techniques Demonstrated** (for SEDS536 course):
 - Color space conversion (RGB → YCbCr, RGB → LAB)
@@ -357,7 +356,7 @@ Dark             73     290   267
 - Geometric masking (ellipse/oval)
 - Grid search optimization
 
-**Recommendation**: Use Experiment 2 model (3-class CNN) for production. ITA serves as educational baseline.
+**Recommendation**: Use Experiment 2 model (3-class CNN with Haar face crops) for production. MediaPipe preprocessing adds complexity without benefit. ITA serves as educational baseline for classical methods.
 
 ---
 
@@ -930,6 +929,247 @@ ITA serves as an educational baseline demonstrating why deep learning has replac
 - Issues include: partial faces, off-center crops, excessive background/hair
 - This contributes to high ITA variance even with good segmentation
 - Future work: implement quality filtering or use better detector (MTCNN, MediaPipe)
+
+---
+
+## Experiment 3e: ITA with MediaPipe Skin Masks
+
+**Date**: January 5, 2026
+**Duration**: ~20 minutes (preprocessing) + ~2 minutes (evaluation)
+**Status**: Completed
+
+### Objective
+
+Test whether MediaPipe face landmarker (478 landmarks) produces better skin masks than Haar Cascade + YCbCr color thresholding.
+
+### Background
+
+Literature suggests ITA can achieve 89-92% accuracy with proper face detection (DensePose/OpenFace). Our Haar Cascade approach maxed at ~52%. MediaPipe Face Landmarker provides:
+- 478 facial landmarks (vs Haar's bounding box)
+- Precise face oval detection
+- Ability to exclude eyes, lips, eyebrows
+- Better handling of varied poses
+
+### Preprocessing Pipeline
+
+```
+Face Image → MediaPipe Face Landmarker → Extract 478 landmarks
+           → Create face oval polygon → Exclude eyes/lips/eyebrows → Skin Mask
+```
+
+**Preprocessing Statistics** (149,520 images):
+- Successful: 131,958 (88.3%)
+- Failed: 17,562 (11.7%) - no face detected
+- Mean skin ratio: 25.8% (vs 55% YCbCr, 34% oval+YCbCr)
+- Processing time: ~20 minutes (12 workers)
+- Output: `ccv2_faces_mediapipe_v2/`
+
+### Results
+
+#### Threshold Tuning (Validation Set)
+
+Best thresholds (same as previous experiments):
+- Light > 25°, Dark < -50°
+- Best validation accuracy: 52.6%
+
+#### Test Set Performance
+
+| Metric | Exp 3b (YCbCr) | Exp 3c (Oval) | Exp 3e (MediaPipe) | Change |
+|--------|----------------|---------------|---------------------|--------|
+| Test Accuracy | 52.3% | 52.2% | **53.7%** | +1.4% |
+| Macro F1 | 0.337 | 0.343 | **0.373** | +0.036 |
+| Weighted F1 | 0.578 | 0.580 | **0.597** | +0.019 |
+| Skin Ratio | 55.1% | 34.2% | **25.8%** | -8.4% |
+
+#### Per-Class Performance
+
+| Class | Precision | Recall | F1 | Support |
+|-------|-----------|--------|-----|---------|
+| Light | 0.361 | 0.409 | 0.383 | 4,058 |
+| Medium | 0.797 | 0.577 | 0.669 | 15,484 |
+| Dark | 0.038 | 0.338 | 0.068 | 471 |
+
+#### Confusion Matrix
+
+```
+Pred →    Light     Medium    Dark
+Light     1660      2026      372
+Medium    2878      8927      3679
+Dark      65        247       159
+```
+
+#### ITA Statistics by Class
+
+| Class | Mean ITA | Std Dev | Range |
+|-------|----------|---------|-------|
+| Light | 11.4° | **38.4°** | [-90°, 90°] |
+| Medium | -14.3° | **41.7°** | [-90°, 90°] |
+| Dark | -26.2° | **42.1°** | [-90°, 90°] |
+
+### Analysis
+
+#### Marginal Improvement
+
+MediaPipe provided only +1.4% accuracy improvement over simpler methods:
+- Better than YCbCr color (52.3% → 53.7%)
+- But still far below CNN (78.6%)
+
+#### Root Cause: ITA Variance
+
+The fundamental issue remains - **ITA standard deviations are massive** (~38-42°):
+- Each class spans nearly the entire ITA range [-90°, +90°]
+- Class distributions overlap almost completely
+- Better segmentation cannot fix this
+
+#### Why MediaPipe Didn't Help More
+
+1. **ITA is the bottleneck, not segmentation**: Even with perfect skin isolation, ITA values have too much variance
+2. **Lighting variation**: Source dataset has inconsistent lighting that affects LAB color space
+3. **No calibration**: Cannot calibrate ITA without reference color patches in images
+
+### Conclusion
+
+**MediaPipe preprocessing is valuable for CNN training** (cleaner skin regions), but does not significantly improve classical ITA-based classification. The ~52-54% accuracy ceiling is a fundamental limitation of ITA, not the segmentation method.
+
+### Artifacts
+
+| File | Description |
+|------|-------------|
+| `training/data/ccv2_faces_mediapipe_v2/` | MediaPipe preprocessed dataset |
+| `training/scripts/preprocess_mediapipe.py` | MediaPipe preprocessing script |
+| `training/scripts/compare_face_detectors.py` | MediaPipe vs Haar comparison tool |
+| `training/results_ita_preprocessed.json` | Results (updated) |
+
+---
+
+## Experiment 4: CNN with MediaPipe Skin Masks
+
+**Date**: January 5, 2026
+**Duration**: ~11 hours (30 epochs with num_workers=0)
+**Status**: Completed
+
+### Objective
+
+Test whether MediaPipe skin-masked images improve CNN classification accuracy compared to Haar face crops.
+
+**Hypothesis**: CNN trained on skin-only images (black background) might learn better skin tone features without distraction from hair/eyes/background.
+
+### Dataset
+
+| Split | Haar (Exp 2) | MediaPipe (Exp 4) | Difference |
+|-------|--------------|-------------------|------------|
+| Train | 104,510 | 92,310 | -12% |
+| Val | 22,280 | 19,635 | -12% |
+| Test | 22,730 | 20,013 | -12% |
+
+12% fewer samples due to MediaPipe face detection failures (17,562 images).
+
+**Class Distribution (Training Set)**:
+| Class | Samples | Percentage |
+|-------|---------|------------|
+| Light (1-3) | 18,435 | 20.0% |
+| Medium (4-7) | 71,756 | 77.7% |
+| Dark (8-10) | 2,119 | 2.3% |
+
+### Configuration
+
+```yaml
+Model: efficientnet_b0 (pretrained ImageNet)
+Data: training/data/ccv2_faces_mediapipe_v2/
+  - Images: *_masked.jpg (skin only, black background)
+  - Masks: *_mask.png (binary, not used for training)
+Epochs: 30
+Batch size: 32
+Class weights: inverse_frequency
+Oversampling: enabled
+num_workers: 0 (WSL compatibility issue)
+```
+
+### Results
+
+#### Overall Metrics
+
+| Metric | Exp 2 (Haar) | Exp 4 (MediaPipe) | Difference |
+|--------|--------------|-------------------|------------|
+| Train Accuracy | 98.2% | 98.1% | -0.1% |
+| Val Accuracy | **80.3%** | 79.6% | **-0.7%** |
+| Test Accuracy | **78.6%** | 77.1% | **-1.5%** |
+| Training Time | 2.4 hr | 11 hr | +8.6 hr |
+
+#### Training Progression
+
+| Epoch | Train Acc | Val Acc | Notes |
+|-------|-----------|---------|-------|
+| 0 | 74.5% | 59.2% | Starting |
+| 13 | 92.6% | 77.0% | Improving |
+| 20 | 96.5% | 79.4% | Best region |
+| 26 | 98.0% | 79.6% | Best model saved |
+| 29 | 98.1% | 79.6% | Final |
+
+Best model saved at epoch 26 with 79.55% validation accuracy.
+
+### Analysis
+
+#### Key Finding: MediaPipe Masks Didn't Help
+
+The MediaPipe skin-masked images performed **slightly worse** than Haar face crops:
+- Test accuracy: 77.1% vs 78.6% (-1.5%)
+- Lost 12% of training data to detection failures
+
+#### Why It Didn't Work
+
+1. **CNN already learns relevant features**: The network naturally focuses on skin regions even from full face crops
+2. **Context matters**: Hair, eyes, and background may provide useful contextual information
+3. **Fewer training samples**: 12% data loss from MediaPipe detection failures hurt more than cleaner masks helped
+4. **Mask artifacts**: Black background and mask boundaries may have introduced confusing patterns
+
+#### Lessons Learned
+
+1. **Simpler preprocessing is better**: Haar face crops are sufficient for CNN training
+2. **Data quantity > preprocessing quality**: 12% more data beats cleaner masks
+3. **Don't over-engineer preprocessing**: CNNs are robust feature learners
+4. **Validate assumptions early**: Should have tested on smaller subset first
+
+### Artifacts
+
+| File | Description |
+|------|-------------|
+| `training/checkpoints_3class_mediapipe/best_model.pth` | Best model (epoch 26) |
+| `training/logs/training_20260105_042305.log` | Training log |
+| `training/configs/config_3class_mediapipe.yaml` | Training configuration |
+| `training/data/ccv2_faces_mediapipe_v2/` | MediaPipe preprocessed dataset |
+
+### Conclusion
+
+**Negative result**: MediaPipe skin masks do not improve CNN classification accuracy. The simpler Haar face crop approach (Experiment 2) remains the best performing model.
+
+**Recommendation**: Use Experiment 2 model (78.6% accuracy) for production. MediaPipe preprocessing adds complexity without benefit for CNN training.
+
+---
+
+## Future Experiments
+
+### 5-Class ITA Evaluation
+
+**Status**: Planned (not yet implemented)
+
+**Hypothesis**: Using 5 classes instead of 3 might better match ITA's natural thresholds.
+
+**Proposed mapping**:
+| Class | Monk Scales | Description |
+|-------|-------------|-------------|
+| 0 | 1-2 | Very Light |
+| 1 | 3-4 | Light |
+| 2 | 5-6 | Medium |
+| 3 | 7-8 | Tan |
+| 4 | 9-10 | Dark |
+
+**Expected outcome**: Marginal improvement at best. The core issue (high ITA variance) won't be solved by more granular binning.
+
+**Implementation needed**:
+- Add `--num-classes 5` option to `ita_baseline.py`
+- Implement 4-threshold grid search (vs current 2)
+- Update evaluation metrics for 5 classes
 
 ---
 

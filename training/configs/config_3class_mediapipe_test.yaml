@@ -1,0 +1,60 @@
+# TEST configuration - verify MediaPipe data loading works
+# Run with: uv run python -m training.scripts.train --config training/configs/config_3class_mediapipe_test.yaml
+
+data:
+  train_dir: "training/data/ccv2_faces_mediapipe_v2/train"
+  val_dir: "training/data/ccv2_faces_mediapipe_v2/val"
+  test_dir: "training/data/ccv2_faces_mediapipe_v2/test"
+  num_classes: 3
+  class_grouping: "3class"
+
+model:
+  architecture: "efficientnet_b0"
+  pretrained: true
+  dropout: 0.3
+
+training:
+  batch_size: 32
+  num_epochs: 2  # Just 2 epochs for testing
+  max_batches_per_epoch: 10  # Only 10 batches per epoch
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  scheduler:
+    type: "cosine"
+  early_stopping:
+    enabled: false
+  class_weights: "inverse_frequency"
+  use_oversampling: true
+
+augmentation:
+  train:
+    resize: 256
+    crop_size: 224
+    horizontal_flip: true
+    rotation: 15
+    color_jitter:
+      brightness: 0.2
+      contrast: 0.2
+      saturation: 0.2
+      hue: 0.1
+    normalize:
+      mean: [0.485, 0.456, 0.406]
+      std: [0.229, 0.224, 0.225]
+  val:
+    resize: 256
+    crop_size: 224
+    normalize:
+      mean: [0.485, 0.456, 0.406]
+      std: [0.229, 0.224, 0.225]
+
+output:
+  checkpoint_dir: "training/checkpoints_test"
+  log_dir: "training/logs"
+  save_frequency: 1
+
+hardware:
+  device: "auto"
+  num_workers: 0  # WSL has issues with multiprocessing DataLoader
+  pin_memory: false
+
+seed: 42
