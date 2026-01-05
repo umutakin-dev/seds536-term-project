@@ -1,0 +1,539 @@
+\documentclass[12pt]{article}
+
+\usepackage{graphics}
+\usepackage{epsfig}
+\usepackage{times}
+\usepackage{amsmath}
+\usepackage{subcaption}
+\usepackage{multirow}
+\usepackage{gensymb}
+\usepackage{array}
+\usepackage{float}
+\usepackage{indentfirst}
+\newcolumntype{P}[1]{>{\centering\arraybackslash}p{#1}}
+\usepackage{booktabs, makecell}
+\usepackage{diagbox}
+\usepackage{float}
+\floatstyle{plaintop}
+\restylefloat{table}
+\usepackage{natbib}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+
+% Code listing style
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  backgroundcolor=\color{gray!10}
+}
+
+\topmargin      0.0in
+\headheight     0.0in
+\headsep        0.0in
+\oddsidemargin  0.0in
+\evensidemargin 0.0in
+\textheight     9.0in
+\textwidth      6.5in
+
+\title{{\bf SEDS536 Image Understanding \\ Term Project Report \\ Fall 2025} \\
+	\it Skin Tone Detection for Inclusive Skincare Recommendations: \\ A Comparison of Classical and Deep Learning Approaches}
+
+\date{\today}
+
+\begin{document}
+
+\pagestyle{plain}
+\pagenumbering{roman}
+\maketitle
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[scale=0.35]{../project-materials/iyte_logo}
+\end{figure}
+
+\textbf{Student Information}
+\begin{itemize}
+	\item Umut Akin
+\end{itemize}
+
+\cleardoublepage
+\pagenumbering{arabic}
+
+%==============================================================================
+% ABSTRACT
+%==============================================================================
+\begin{abstract}
+This project addresses the challenge of inclusive skin tone detection for personalized skincare recommendations. We compare classical image processing techniques with deep learning approaches, evaluating their accuracy and fairness across diverse skin tones using the Monk Skin Tone Scale.
+
+Our classical approach implements the Individual Typology Angle (ITA) method, incorporating color space conversion (RGB to YCbCr and LAB), skin segmentation via thresholding, and morphological operations (opening and closing) for mask refinement. We tested multiple segmentation methods including YCbCr color thresholding, face oval masking, and MediaPipe face landmarks.
+
+For deep learning, we trained an EfficientNet-B0 model with transfer learning, optimized for on-device mobile inference to protect user privacy. The model was trained on Meta's Casual Conversations v2 dataset with 150,000+ images annotated using the 10-point Monk scale.
+
+Results show that the CNN approach (78.6\% accuracy) dramatically outperforms classical ITA (52.3\% best case). We discovered that ITA is fundamentally misaligned with the Monk scale due to a non-monotonic relationship between ITA values and perceptual skin tone categories. Key challenges include severe class imbalance (Scale 5 has 394$\times$ more samples than Scale 10) and a 42\% accuracy gap between best and worst performing classes.
+
+The final model achieves on-device inference in under 2 seconds with a 15MB TFLite model, meeting privacy requirements while providing practical skin tone classification for mobile applications.
+\end{abstract}
+
+\cleardoublepage
+
+%==============================================================================
+% INTRODUCTION
+%==============================================================================
+\section{Introduction}
+
+\subsection{Problem Statement}
+The skincare and cosmetics industry often fails to provide inclusive product recommendations for individuals across the full spectrum of skin tones. Many existing solutions either rely on subjective self-assessment or use classification systems that under-represent darker skin tones. This project aims to develop an automated, fair, and privacy-preserving skin tone detection system for mobile applications.
+
+\subsection{Motivation}
+Three key factors motivate this work:
+
+\begin{enumerate}
+    \item \textbf{Fairness}: Traditional skin classification systems like the Fitzpatrick scale \citep{fitzpatrick1988validity} were designed for UV sensitivity assessment, not skin color representation. Recent research \citep{buolamwini2018gender} has highlighted significant bias in computer vision systems, particularly for darker skin tones.
+
+    \item \textbf{Privacy}: Users should not be required to upload facial images to remote servers for skin tone analysis. On-device processing ensures that sensitive biometric data never leaves the user's device.
+
+    \item \textbf{Accessibility}: A mobile application with on-device ML can provide instant, offline skin tone analysis without requiring internet connectivity or subscription services.
+\end{enumerate}
+
+\subsection{Objectives}
+The primary objectives of this project are:
+
+\begin{enumerate}
+    \item Implement and evaluate classical image processing techniques for skin tone classification, demonstrating course concepts including color space conversion, thresholding, and morphological operations.
+
+    \item Develop a deep learning model that achieves high accuracy while being efficient enough for on-device mobile inference.
+
+    \item Analyze fairness across skin tone categories, with a goal of minimizing accuracy disparities between light and dark skin tones.
+
+    \item Compare classical and learned approaches to understand the limitations and strengths of each methodology.
+\end{enumerate}
+
+\subsection{Scope}
+This project focuses on:
+\begin{itemize}
+    \item 3-class (Light/Medium/Dark) and 5-class skin tone classification
+    \item Comparison of ITA-based classical methods vs CNN-based deep learning
+    \item Evaluation using the Monk Skin Tone Scale \citep{monk2019skin}
+    \item Mobile-optimized model deployment (TFLite)
+\end{itemize}
+
+%==============================================================================
+% LITERATURE REVIEW
+%==============================================================================
+\section{Literature Review}
+
+\subsection{Skin Tone Classification Scales}
+
+\subsubsection{Fitzpatrick Scale}
+The Fitzpatrick Skin Type scale \citep{fitzpatrick1988validity} classifies skin into six categories (I-VI) based on response to UV exposure. While widely used in dermatology, it has limitations for computer vision applications: it was designed for sun sensitivity rather than color representation, and its six categories under-represent the diversity of darker skin tones.
+
+\subsubsection{Monk Skin Tone Scale}
+The Monk Skin Tone (MST) scale \citep{monk2019skin} was developed specifically for machine learning fairness evaluation. It provides 10 categories with better representation across the full spectrum of human skin tones. We adopt this scale for our experiments, grouping into 3 classes (Light: 1-3, Medium: 4-7, Dark: 8-10) or 5 classes for different granularity levels.
+
+\subsection{Classical Approaches: Individual Typology Angle (ITA)}
+
+The Individual Typology Angle (ITA) is a dermatology standard for objective skin color measurement \citep{chardon1991skin, delbino2013variations}. It is calculated from the CIE LAB color space:
+
+\begin{equation}
+    ITA = \arctan\left(\frac{L^* - 50}{b^*}\right) \times \frac{180}{\pi}
+\end{equation}
+
+where $L^*$ represents lightness and $b^*$ represents the yellow-blue axis. Higher ITA values indicate lighter skin. Standard thresholds classify skin as Very Light ($>55\degree$), Light ($41\degree$-$55\degree$), Intermediate ($28\degree$-$41\degree$), Tan ($10\degree$-$28\degree$), or Dark ($<10\degree$).
+
+\subsection{Skin Segmentation Techniques}
+
+Effective ITA calculation requires isolating skin pixels from non-skin regions (hair, eyes, background). Common approaches include:
+
+\begin{itemize}
+    \item \textbf{Color-based segmentation}: YCbCr color space thresholding is widely used for skin detection \citep{vezhnevets2003survey}, as skin colors cluster in a relatively compact region of the Cb-Cr plane regardless of ethnicity.
+
+    \item \textbf{Face detection}: Haar Cascade classifiers \citep{viola2004robust} provide fast face detection but produce coarse bounding boxes. MediaPipe Face Mesh \citep{lugaresi2019mediapipe} provides 478 facial landmarks for precise face region extraction.
+
+    \item \textbf{Morphological operations}: Opening (erosion followed by dilation) removes noise, while closing (dilation followed by erosion) fills holes \citep{gonzalez2009digital}.
+\end{itemize}
+
+\subsection{Deep Learning Approaches}
+
+Convolutional Neural Networks (CNNs) have largely replaced classical methods for image classification tasks. Transfer learning \citep{weiss2016survey} enables training effective models even with limited data by leveraging features learned from large datasets like ImageNet \citep{deng2009imagenet}.
+
+EfficientNet \citep{tan2019efficientnet} provides an excellent accuracy-efficiency tradeoff through compound scaling of network depth, width, and resolution. EfficientNet-B0, with only 4 million parameters, is suitable for mobile deployment while achieving strong classification performance.
+
+\subsection{Fairness in Machine Learning}
+
+\cite{buolamwini2018gender} demonstrated significant accuracy disparities in commercial face analysis systems, with error rates up to 34\% higher for darker-skinned females compared to lighter-skinned males. \cite{mehrabi2021survey} provide a comprehensive survey of bias sources and mitigation strategies in ML systems.
+
+Key fairness metrics include:
+\begin{itemize}
+    \item \textbf{Accuracy parity}: Similar accuracy across demographic groups
+    \item \textbf{Equalized odds}: Similar true positive and false positive rates
+    \item \textbf{Worst-case performance}: Minimum accuracy across all groups
+\end{itemize}
+
+%==============================================================================
+% METHODOLOGY
+%==============================================================================
+\section{Methodology}
+
+\subsection{Dataset}
+
+We use the Casual Conversations v2 (CCv2) dataset \citep{porgali2023casual} from Meta AI Research. This dataset contains video frames with Monk Skin Tone scale annotations (1-10).
+
+\begin{table}[H]
+\centering
+\caption{Dataset Statistics}
+\begin{tabular}{lrrr}
+\toprule
+\textbf{Split} & \textbf{Images} & \textbf{Purpose} \\
+\midrule
+Train & 104,510 & Model training \\
+Validation & 22,280 & Hyperparameter tuning \\
+Test & 22,730 & Final evaluation \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The dataset exhibits severe class imbalance: Scale 5 (Medium) contains 45\% of all samples, while Scale 10 (Darkest) contains only 0.1\%. This 394$\times$ imbalance presents a significant challenge for fair classification.
+
+\subsection{Classical Approach: ITA with Skin Segmentation}
+
+Our classical pipeline implements the following steps:
+
+\subsubsection{Step 1: Face Detection}
+We tested two face detection methods:
+\begin{itemize}
+    \item \textbf{Haar Cascade}: OpenCV's pre-trained frontal face detector \citep{viola2004robust}. Fast but produces coarse bounding boxes.
+    \item \textbf{MediaPipe Face Landmarker}: Provides 478 facial landmarks for precise face region extraction \citep{lugaresi2019mediapipe}.
+\end{itemize}
+
+\subsubsection{Step 2: Color Space Conversion}
+Convert from RGB to YCbCr for skin detection:
+\begin{lstlisting}[language=Python]
+image_ycbcr = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2YCrCb)
+\end{lstlisting}
+
+\subsubsection{Step 3: Skin Thresholding}
+Apply thresholds to isolate skin pixels:
+\begin{lstlisting}[language=Python]
+# YCbCr skin thresholds (literature-based)
+Cb_range = [77, 127]
+Cr_range = [133, 173]
+mask = ((Cb >= 77) & (Cb <= 127) &
+        (Cr >= 133) & (Cr <= 173))
+\end{lstlisting}
+
+\subsubsection{Step 4: Morphological Operations}
+Apply opening and closing to clean the mask:
+\begin{lstlisting}[language=Python]
+kernel = cv2.getStructuringElement(
+    cv2.MORPH_ELLIPSE, (5, 5))
+# Opening: removes small noise
+mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+# Closing: fills small holes
+mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+\end{lstlisting}
+
+\subsubsection{Step 5: ITA Calculation}
+Convert to LAB color space and compute ITA on skin pixels:
+\begin{lstlisting}[language=Python]
+image_lab = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2LAB)
+L = image_lab[:,:,0] * 100.0 / 255.0  # Scale to [0,100]
+b = image_lab[:,:,2] - 128.0  # Center at 0
+L_mean = np.mean(L[skin_mask])
+b_mean = np.mean(b[skin_mask])
+ITA = np.arctan((L_mean - 50) / b_mean) * (180 / np.pi)
+\end{lstlisting}
+
+\subsubsection{Step 6: Threshold-based Classification}
+Map ITA values to classes using tuned thresholds:
+\begin{itemize}
+    \item 3-class: Light ($>25\degree$), Medium ($-50\degree$ to $25\degree$), Dark ($<-50\degree$)
+    \item Thresholds tuned via grid search on validation set
+\end{itemize}
+
+\subsection{Deep Learning Approach: EfficientNet-B0}
+
+\subsubsection{Architecture}
+We use EfficientNet-B0 \citep{tan2019efficientnet} pre-trained on ImageNet \citep{deng2009imagenet}:
+\begin{itemize}
+    \item Input: 224$\times$224$\times$3 RGB images
+    \item Backbone: EfficientNet-B0 (4M parameters)
+    \item Head: Dropout (0.3) $\rightarrow$ Fully Connected $\rightarrow$ Softmax
+    \item Output: 3 or 5 class probabilities
+\end{itemize}
+
+\subsubsection{Training Configuration}
+\begin{table}[H]
+\centering
+\caption{Training Hyperparameters}
+\begin{tabular}{ll}
+\toprule
+\textbf{Parameter} & \textbf{Value} \\
+\midrule
+Optimizer & AdamW \\
+Learning Rate & 0.001 (cosine decay) \\
+Batch Size & 32 \\
+Epochs & 30 \\
+Weight Decay & 0.0001 \\
+Early Stopping & Patience = 7 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Class Imbalance Handling}
+\begin{itemize}
+    \item \textbf{Weighted Loss}: Cross-entropy with inverse frequency class weights
+    \item \textbf{Oversampling}: WeightedRandomSampler to balance mini-batches
+    \item \textbf{Data Augmentation}: Random horizontal flip, rotation ($\pm15\degree$), color jitter (brightness, contrast, saturation, hue)
+\end{itemize}
+
+\subsubsection{Model Conversion}
+For on-device deployment, we convert the PyTorch model to TensorFlow Lite:
+\begin{itemize}
+    \item Tool: ai-edge-torch (Google's PyTorch to TFLite converter)
+    \item Output size: $\sim$15MB
+    \item Inference time: $<$2 seconds on mid-range mobile devices
+\end{itemize}
+
+%==============================================================================
+% EXPERIMENTS & RESULTS
+%==============================================================================
+\section{Experiments \& Results}
+
+\subsection{Experiment Overview}
+
+We conducted six experiments systematically varying the method, preprocessing, and number of classes:
+
+\begin{table}[H]
+\centering
+\caption{Experiment Summary}
+\begin{tabular}{clllc}
+\toprule
+\textbf{Exp} & \textbf{Method} & \textbf{Preprocessing} & \textbf{Classes} & \textbf{Test Acc} \\
+\midrule
+1 & CNN & None & 10 & 38.7\% \\
+2 & CNN & Haar face crop & 3 & \textbf{78.6\%} \\
+3 & ITA & Various & 3 & 52.3\% \\
+4 & CNN & MediaPipe masks & 3 & 77.1\% \\
+5a & ITA & MediaPipe raw & 5 & 17.1\% \\
+5 & CNN & MediaPipe raw & 5 & 62.5\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Experiment 1: 10-Class CNN Baseline}
+
+Training a 10-class classifier on the original Monk scale failed due to severe class imbalance:
+\begin{itemize}
+    \item Test accuracy: 38.7\%
+    \item Scale 10 (darkest): 0\% accuracy (complete failure)
+    \item Model biased toward majority classes (scales 3-6)
+\end{itemize}
+
+\subsection{Experiment 2: 3-Class CNN with Haar Face Crops (Best Model)}
+
+Grouping into 3 classes and using face-cropped images dramatically improved results:
+
+\begin{table}[H]
+\centering
+\caption{Experiment 2: Per-Class Performance}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Class} & \textbf{Precision} & \textbf{Recall} & \textbf{F1} & \textbf{Support} \\
+\midrule
+Light (1-3) & 0.517 & 0.609 & 0.560 & 4,530 \\
+Medium (4-7) & 0.881 & 0.844 & 0.862 & 17,570 \\
+Dark (8-10) & 0.486 & 0.424 & 0.453 & 630 \\
+\midrule
+\textbf{Overall} & \multicolumn{4}{c}{\textbf{78.6\% accuracy, 0.625 Macro F1}} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Experiment 3: ITA Classical Baseline}
+
+We tested ITA with multiple segmentation methods:
+
+\begin{table}[H]
+\centering
+\caption{ITA Experiments Comparison}
+\begin{tabular}{llc}
+\toprule
+\textbf{Variant} & \textbf{Segmentation} & \textbf{Test Acc} \\
+\midrule
+3a & None (raw) & 19.3\% \\
+3b & YCbCr color + tuned thresholds & 52.3\% \\
+3c & Face oval + color & 52.2\% \\
+3d & Smaller oval (0.5$\times$0.7) & 52.3\% \\
+3e & MediaPipe landmarks & 53.7\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Key finding: ITA accuracy plateaus around 52-54\% regardless of segmentation method. The bottleneck is the ITA formula itself, not the preprocessing.
+
+\subsection{Experiment 5a: 5-Class ITA with Empirical Thresholds}
+
+Testing 5-class ITA revealed a critical finding:
+
+\begin{table}[H]
+\centering
+\caption{ITA Medians by Monk Class (5-class)}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Class} & \textbf{Median ITA} & \textbf{Expected Order} \\
+\midrule
+Very Light & 27.4$\degree$ & Highest \\
+Light & 12.5$\degree$ & $\downarrow$ \\
+Medium & -3.4$\degree$ & $\downarrow$ \\
+\textbf{Dark} & \textbf{-6.3$\degree$} & \textbf{Should be lower!} \\
+Very Dark & -61.7$\degree$ & Lowest \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Critical Discovery}: The Dark class has a \textit{higher} median ITA than Medium (-6.3$\degree$ vs -3.4$\degree$). This non-monotonic relationship means ITA-based threshold classification is fundamentally incompatible with the Monk scale.
+
+\subsection{Key Results Summary}
+
+\begin{table}[H]
+\centering
+\caption{Overall Results Comparison}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Method} & \textbf{Classes} & \textbf{Accuracy} & \textbf{Macro F1} & \textbf{Training Time} \\
+\midrule
+ITA (best classical) & 3 & 52.3\% & 0.337 & 0 hours \\
+ITA (5-class) & 5 & 17.1\% & 0.155 & 0 hours \\
+\textbf{CNN 3-class (best)} & 3 & \textbf{78.6\%} & \textbf{0.625} & 2.4 hours \\
+CNN 5-class & 5 & 62.5\% & -- & 7.5 hours \\
+CNN 10-class & 10 & 38.7\% & 0.230 & 6.2 hours \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Fairness Analysis}
+
+\begin{table}[H]
+\centering
+\caption{Fairness Metrics (Best Model: Exp 2)}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Metric} & \textbf{Value} & \textbf{Target} \\
+\midrule
+Accuracy Gap (best - worst) & 42.0\% & $<$10\% \\
+Worst-Case Ratio & 50.2\% & $>$85\% \\
+Best Class (Medium) & 84.4\% & -- \\
+Worst Class (Dark) & 42.4\% & -- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Fairness targets are not met due to data imbalance: Medium class has 77\% of training data while Dark has only 2.5\%. However, significant progress was made---Dark class improved from 0\% (Exp 1) to 42.4\% (Exp 2).
+
+%==============================================================================
+% DISCUSSION
+%==============================================================================
+\section{Discussion}
+
+\subsection{Why CNN Outperforms ITA}
+
+The CNN achieves 78.6\% accuracy compared to ITA's 52.3\% ceiling because:
+
+\begin{enumerate}
+    \item \textbf{Learned vs. Hand-crafted Features}: CNNs learn task-specific features from data, while ITA uses a fixed colorimetric formula designed for clinical settings.
+
+    \item \textbf{Perceptual vs. Colorimetric}: The Monk scale is based on visual perception, not the $L^*/b^*$ ratio. CNNs can learn perceptual features that align with human annotation.
+
+    \item \textbf{Lighting Invariance}: CNNs learn robust features through augmentation, while ITA is sensitive to lighting variation.
+
+    \item \textbf{Non-Monotonic Relationship}: We discovered that ITA values do not monotonically decrease with darker Monk classes, making threshold-based classification impossible.
+\end{enumerate}
+
+\subsection{Preprocessing: Simpler is Better}
+
+Surprisingly, simpler Haar face crops (78.6\%) outperformed sophisticated MediaPipe skin masks (77.1\%). This is because:
+\begin{itemize}
+    \item CNNs naturally learn to focus on relevant regions
+    \item MediaPipe had 12\% detection failures, reducing training data
+    \item Context (hair, background) may provide useful features
+\end{itemize}
+
+\subsection{Limitations}
+
+\begin{enumerate}
+    \item \textbf{Class Imbalance}: 42\% accuracy gap between best and worst classes
+    \item \textbf{Single Dataset}: Results may not generalize to other populations
+    \item \textbf{Uncontrolled Lighting}: CCv2 contains varied smartphone lighting
+    \item \textbf{Privacy Trade-off}: On-device models have less capacity than cloud models
+\end{enumerate}
+
+%==============================================================================
+% CONCLUSION
+%==============================================================================
+\section{Conclusion}
+
+This project demonstrated both classical and deep learning approaches to skin tone classification, achieving the primary goal of on-device inference for privacy-preserving mobile applications.
+
+\textbf{Key Contributions}:
+\begin{enumerate}
+    \item Systematic comparison of ITA (classical) vs CNN (deep learning) approaches
+    \item Discovery that ITA is fundamentally misaligned with the Monk scale
+    \item Mobile-optimized model achieving 78.6\% accuracy in 15MB
+    \item Comprehensive fairness analysis across skin tone categories
+\end{enumerate}
+
+\textbf{Course Concepts Demonstrated}:
+\begin{itemize}
+    \item Color space conversion (RGB $\rightarrow$ YCbCr, RGB $\rightarrow$ LAB)
+    \item Thresholding for skin segmentation
+    \item Morphological operations (erosion, dilation, opening, closing)
+    \item Transfer learning with CNNs
+\end{itemize}
+
+\textbf{Future Work}:
+\begin{itemize}
+    \item Balanced data augmentation to equalize all class sizes
+    \item Focal loss for improved class balance
+    \item Confidence thresholding to reject uncertain predictions
+    \item MLOps pipelines (MLflow) for experiment tracking and model versioning
+    \item User testing with diverse participants
+\end{itemize}
+
+%==============================================================================
+% PROJECT SCHEDULE
+%==============================================================================
+\section{Project Schedule}
+
+\begin{table}[H]
+\centering
+\caption{Project Timeline (Green = Complete, Yellow = In Progress)}
+\begin{tabular}{|l|c|c|c|c|c|c|}
+\hline
+\textbf{Task} & \textbf{W1-2} & \textbf{W3-4} & \textbf{W5-6} & \textbf{W7-8} & \textbf{W9-10} & \textbf{W11+} \\
+\hline
+Literature Review & \cellcolor{green!30}X & & & & & \\
+\hline
+Dataset Preparation & \cellcolor{green!30}X & \cellcolor{green!30}X & & & & \\
+\hline
+ITA Implementation & & \cellcolor{green!30}X & \cellcolor{green!30}X & & & \\
+\hline
+CNN Training & & & \cellcolor{green!30}X & \cellcolor{green!30}X & & \\
+\hline
+Experiments & & & & \cellcolor{green!30}X & \cellcolor{green!30}X & \\
+\hline
+Model Conversion & & & & & \cellcolor{green!30}X & \\
+\hline
+Report \& Presentation & & & & & & \cellcolor{yellow!30}X \\
+\hline
+\end{tabular}
+\end{table}
+
+%==============================================================================
+% BIBLIOGRAPHY
+%==============================================================================
+\bibliographystyle{chicago}
+\bibliography{literature}
+
+\end{document}

@@ -333,13 +333,14 @@ Dark             73     290   267
 
 ## Summary: Experiment Comparison
 
-| Metric | Exp 1 (10-class) | Exp 2 (3-class) | Exp 3 (ITA Raw) | Exp 3b (Color) | Exp 3e (MediaPipe ITA) | Exp 4 (MediaPipe CNN) |
-|--------|------------------|-----------------|-----------------|----------------|------------------------|----------------------|
-| Test Accuracy | 38.7% | **78.6%** | 19.3% | 52.3% | 53.7% | 77.1% |
-| Macro F1 | 0.230 | **0.625** | 0.188 | 0.337 | 0.373 | ~0.60 |
-| Training Time | 6.2 hr | 2.4 hr | **0 hr** | **0 hr** | **0 hr** | 11 hr |
-| Preprocessing | None | Haar face crop | None | YCbCr mask | MediaPipe mask | MediaPipe mask |
-| Method | CNN | CNN | Classical | Classical | Classical | CNN |
+| Metric | Exp 1 (10-class) | Exp 2 (3-class) | Exp 3 (ITA Raw) | Exp 3b (Color) | Exp 3e (MediaPipe ITA) | Exp 4 (MediaPipe CNN) | Exp 5a (5-class ITA) | Exp 5 (5-class CNN) |
+|--------|------------------|-----------------|-----------------|----------------|------------------------|----------------------|----------------------|---------------------|
+| Test Accuracy | 38.7% | **78.6%** | 19.3% | 52.3% | 53.7% | 77.1% | 17.1% | 62.5% |
+| Macro F1 | 0.230 | **0.625** | 0.188 | 0.337 | 0.373 | ~0.60 | 0.155 | -- |
+| Training Time | 6.2 hr | 2.4 hr | **0 hr** | **0 hr** | **0 hr** | 11 hr | **0 hr** | 7.5 hr |
+| Preprocessing | None | Haar face crop | None | YCbCr mask | MediaPipe mask | MediaPipe mask | MediaPipe raw | MediaPipe raw |
+| Classes | 10 | 3 | 3 | 3 | 3 | 3 | 5 | 5 |
+| Method | CNN | CNN | Classical | Classical | Classical | CNN | Classical | CNN |
 
 **Key Findings**:
 1. **CNN (3-class Haar) is best**: 78.6% accuracy, learns features automatically
@@ -348,6 +349,9 @@ Dark             73     290   267
 4. **ITA + preprocessing + tuning**: ~52-54% ceiling regardless of segmentation method
 5. **ITA is the bottleneck**: High variance (std 37-42°), overlapping distributions
 6. **Data quantity > preprocessing quality**: 12% more training data beats cleaner masks
+7. **ITA fundamentally misaligned with Monk scale**: Non-monotonic relationship (Dark > Medium in ITA space)
+8. **5-class ITA fails worse than 3-class**: 17.1% vs 52.3% - more granular binning exposes ITA limitations
+9. **5-class CNN viable**: 62.5% accuracy, 3.7x better than 5-class ITA (17.1%)
 
 **Classical Techniques Demonstrated** (for SEDS536 course):
 - Color space conversion (RGB → YCbCr, RGB → LAB)
@@ -355,8 +359,9 @@ Dark             73     290   267
 - Morphological operations (erosion, dilation)
 - Geometric masking (ellipse/oval)
 - Grid search optimization
+- Empirical threshold derivation from data distributions
 
-**Recommendation**: Use Experiment 2 model (3-class CNN with Haar face crops) for production. MediaPipe preprocessing adds complexity without benefit. ITA serves as educational baseline for classical methods.
+**Recommendation**: Use Experiment 2 model (3-class CNN with Haar face crops) for production. MediaPipe preprocessing adds complexity without benefit. ITA serves as educational baseline demonstrating why perceptual tasks require learned features.
 
 ---
 
@@ -1147,29 +1152,243 @@ The MediaPipe skin-masked images performed **slightly worse** than Haar face cro
 
 ---
 
-## Future Experiments
+## Experiment 5a: 5-Class ITA with Empirical Monk Thresholds
 
-### 5-Class ITA Evaluation
+**Date**: January 5, 2026
+**Duration**: ~1 hour (preprocessing analysis + threshold tuning + evaluation)
+**Status**: Completed
 
-**Status**: Planned (not yet implemented)
+### Objective
 
-**Hypothesis**: Using 5 classes instead of 3 might better match ITA's natural thresholds.
+Test 5-class ITA classification using:
+1. MediaPipe preprocessing on raw frames (bypassing Haar detector entirely)
+2. Empirical thresholds derived from actual Monk scale ITA distributions
 
-**Proposed mapping**:
+### Background: Why Raw Frames?
+
+Previous experiments stacked two detectors: Raw → Haar crop → MediaPipe mask. This loses context and compounds errors. The new approach runs MediaPipe directly on raw 1080×1920 frames for single-pass face detection.
+
+### Preprocessing: MediaPipe on Raw Frames
+
+```
+Raw Frame (1080×1920) → MediaPipe Face Landmarker → Face crop (224×224) + Skin mask
+```
+
+**Statistics** (149,520 images):
+- Successful: 96,819 (64.8%)
+- Failed: 52,701 (35.2%) - lower than Haar's 93% but cleaner results
+- Mean skin ratio: 36.0%
+- Output: `ccv2_mediapipe_raw/`
+
+### 5-Class Mapping
+
 | Class | Monk Scales | Description |
 |-------|-------------|-------------|
 | 0 | 1-2 | Very Light |
 | 1 | 3-4 | Light |
 | 2 | 5-6 | Medium |
-| 3 | 7-8 | Tan |
-| 4 | 9-10 | Dark |
+| 3 | 7-8 | Dark |
+| 4 | 9-10 | Very Dark |
 
-**Expected outcome**: Marginal improvement at best. The core issue (high ITA variance) won't be solved by more granular binning.
+### Results: Fitzpatrick vs Empirical Thresholds
 
-**Implementation needed**:
-- Add `--num-classes 5` option to `ita_baseline.py`
-- Implement 4-threshold grid search (vs current 2)
-- Update evaluation metrics for 5 classes
+#### Fitzpatrick Thresholds (Literature)
+
+Standard dermatological thresholds designed for controlled lighting:
+
+| Threshold | Value |
+|-----------|-------|
+| Very Light | > 55° |
+| Light | > 41° |
+| Medium | > 28° |
+| Dark | > 10° |
+
+**Result**: **11.5% accuracy** - Complete failure. Thresholds misaligned with real-world data.
+
+#### Empirical Monk Thresholds (Data-Driven)
+
+Computed thresholds from validation set ITA medians:
+
+**Per-class ITA medians**:
+| Class | Median ITA | Fitzpatrick Expected |
+|-------|------------|----------------------|
+| Very Light | 27.4° | > 55° |
+| Light | 12.5° | 41-55° |
+| Medium | -3.4° | 28-41° |
+| **Dark** | **-6.3°** | 10-28° |
+| Very Dark | -61.7° | < 10° |
+
+**Derived thresholds** (midpoints between medians):
+| Threshold | Value |
+|-----------|-------|
+| Very Light | > 20.0° |
+| Light | > 4.6° |
+| Medium | > -4.8° |
+| Dark | > -34.0° |
+
+**Result**: **17.1% accuracy** (+5.6% vs Fitzpatrick, still poor)
+
+### Critical Finding: Non-Monotonic Relationship
+
+**The Dark class has a HIGHER median ITA than Medium (-6.3° vs -3.4°)!**
+
+This fundamentally breaks ITA classification:
+- ITA assumes: Lighter skin → Higher ITA → Darker skin = Lower ITA
+- Monk scale: Based on visual perception, not L*/b* ratio
+- Reality: Monk Dark (scales 7-8) has different color characteristics than Medium (scales 5-6) that don't follow ITA ordering
+
+### Per-Class Performance (Empirical Thresholds)
+
+| Class | Precision | Recall | F1 | Support |
+|-------|-----------|--------|-----|---------|
+| Very Light | 0.126 | 0.592 | 0.208 | 1,098 |
+| Light | 0.335 | 0.156 | 0.213 | 5,652 |
+| Medium | 0.550 | 0.099 | 0.167 | 7,326 |
+| Dark | 0.081 | 0.232 | 0.121 | 955 |
+| Very Dark | 0.035 | 0.661 | 0.066 | 177 |
+
+### Confusion Matrix
+
+```
+Pred →      Very Light  Light       Medium      Dark        Very Dark
+Very Light  650         152         73          108         115
+Light       2269        883         432         1108        960
+Medium      1939        1429        722         1281        1955
+Dark        278         146         80          222         229
+Very Dark   20          26          5           9           117
+```
+
+Heavy confusion between Medium and Dark classes confirms the non-monotonic ITA relationship.
+
+### Analysis
+
+#### Why 5-Class ITA Failed
+
+1. **Non-monotonic relationship**: Dark > Medium in ITA space
+2. **High variance persists**: Std dev 37-45° per class
+3. **Threshold-based classification cannot work** when class ordering doesn't match ITA ordering
+
+#### Comparison: 3-Class vs 5-Class ITA
+
+| Configuration | Accuracy | Notes |
+|---------------|----------|-------|
+| 3-class + Fitzpatrick | 19.3% | Literature thresholds |
+| 3-class + Tuned | 52.3% | Empirical thresholds |
+| 5-class + Fitzpatrick | 11.5% | Complete misalignment |
+| 5-class + Tuned | 17.1% | Non-monotonic prevents success |
+
+### Conclusion
+
+**ITA is fundamentally misaligned with the Monk Skin Tone scale.**
+
+The Monk scale is perceptually-based (how skin tones appear to humans), while ITA measures a specific colorimetric ratio (L*/b*). These don't have a simple monotonic relationship, especially for middle-to-dark skin tones.
+
+This strongly validates the CNN approach - neural networks can learn the non-linear perceptual relationships that ITA cannot capture.
+
+### Artifacts
+
+| File | Description |
+|------|-------------|
+| `training/data/ccv2_mediapipe_raw/` | MediaPipe raw frame preprocessed dataset |
+| `training/scripts/preprocess_mediapipe_raw.py` | Raw frame preprocessing script |
+| `training/scripts/ita_baseline.py` | Updated with `compute_empirical_thresholds()` |
+| `training/results_ita_preprocessed_5class.json` | Detailed results |
+
+---
+
+## Experiment 5: 5-Class CNN on MediaPipe Raw Frames
+
+**Date**: January 5, 2026
+**Duration**: In progress
+**Status**: Training
+
+### Objective
+
+Train a 5-class CNN on MediaPipe-preprocessed raw frames to test whether:
+1. Finer-grained 5-class classification is viable with CNN
+2. MediaPipe on raw frames (single-pass) improves over Haar crops
+
+### Dataset
+
+| Split | Images | Notes |
+|-------|--------|-------|
+| Train | 134,500 | From ccv2_mediapipe_raw |
+| Val | 28,722 | |
+| Test | 30,416 | |
+
+**Class Distribution (Test Set)**:
+| Class | Samples | Percentage |
+|-------|---------|------------|
+| Very Light (1-2) | 1,098 | 7.2% |
+| Light (3-4) | 5,652 | 37.1% |
+| Medium (5-6) | 7,326 | 48.1% |
+| Dark (7-8) | 955 | 6.3% |
+| Very Dark (9-10) | 177 | 1.2% |
+
+### Configuration
+
+```yaml
+Model: efficientnet_b0 (pretrained ImageNet)
+Data: training/data/ccv2_mediapipe_raw/
+Classes: 5 (Very Light, Light, Medium, Dark, Very Dark)
+Epochs: 30
+Batch size: 32
+Class weights: inverse_frequency
+Oversampling: enabled
+Checkpoint: training/checkpoints_5class_mediapipe_raw/
+```
+
+### Results
+
+#### Overall Metrics
+
+| Metric | Value |
+|--------|-------|
+| Best Val Accuracy | 64.04% (Epoch 29) |
+| **Test Accuracy** | **62.53%** |
+| Train Accuracy | 99.42% |
+| Training Time | ~7.5 hours (30 epochs) |
+
+#### Training Progression
+
+| Epoch | Train Acc | Val Acc | Notes |
+|-------|-----------|---------|-------|
+| 0 | 59.7% | 31.1% | Starting |
+| 12 | 93.5% | 61.3% | Improving |
+| 17 | 97.1% | 62.4% | |
+| 23 | 99.0% | 63.4% | |
+| 29 | 99.4% | 64.0% | Best model saved |
+
+#### Comparison: 5-Class CNN vs 5-Class ITA
+
+| Method | Test Accuracy | Improvement |
+|--------|---------------|-------------|
+| ITA (Exp 5a) | 17.1% | Baseline |
+| **CNN (Exp 5)** | **62.5%** | **+45.4%** (3.7x better) |
+
+### Analysis
+
+#### Key Findings
+
+1. **5-class CNN viable**: 62.5% accuracy is reasonable for 5-class task
+2. **CNN >> ITA**: 3.7x improvement over ITA (62.5% vs 17.1%)
+3. **3-class still best**: 78.6% (3-class) > 62.5% (5-class) as expected
+4. **Overfitting observed**: Train 99.4% vs Val 64.0% gap
+
+#### 5-Class vs 3-Class Tradeoff
+
+| Classes | Accuracy | Granularity | Use Case |
+|---------|----------|-------------|----------|
+| 3 | 78.6% | Low | Production (higher accuracy) |
+| 5 | 62.5% | Medium | Research (finer detail) |
+
+### Artifacts
+
+| File | Description |
+|------|-------------|
+| `training/configs/config_5class_mediapipe_raw.yaml` | Training configuration |
+| `training/checkpoints_5class_mediapipe_raw/best_model.pth` | Best model (epoch 29) |
+| `training/logs/training_20260105_175725.log` | Training log |
 
 ---
 

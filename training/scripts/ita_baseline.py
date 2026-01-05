@@ -51,20 +51,41 @@ from skin_segmentation import segment_skin
 
 # ITA thresholds for 3-class mapping
 # These can be tuned based on dataset characteristics
-ITA_THRESHOLDS = {
+ITA_THRESHOLDS_3CLASS = {
     "light_min": 41.0,   # ITA > 41 -> Light
     "dark_max": 10.0,    # ITA < 10 -> Dark
     # 10 <= ITA <= 41 -> Medium
 }
 
-# Class names matching CNN model
-CLASS_NAMES = ["Light", "Medium", "Dark"]
+# ITA thresholds for 5-class mapping (4 boundaries)
+ITA_THRESHOLDS_5CLASS = {
+    "very_light_min": 55.0,  # ITA > 55 -> Very Light
+    "light_min": 41.0,       # 41 < ITA <= 55 -> Light
+    "medium_min": 28.0,      # 28 < ITA <= 41 -> Medium
+    "dark_min": 10.0,        # 10 < ITA <= 28 -> Dark
+    # ITA <= 10 -> Very Dark
+}
+
+# Class names for 3-class system
+CLASS_NAMES_3CLASS = ["Light", "Medium", "Dark"]
+
+# Class names for 5-class system
+CLASS_NAMES_5CLASS = ["Very Light", "Light", "Medium", "Dark", "Very Dark"]
 
 # Monk scale to 3-class mapping (same as CNN training)
 MONK_TO_3CLASS = {
     1: 0, 2: 0, 3: 0,        # Light (scales 1-3)
     4: 1, 5: 1, 6: 1, 7: 1,  # Medium (scales 4-7)
     8: 2, 9: 2, 10: 2,       # Dark (scales 8-10)
+}
+
+# Monk scale to 5-class mapping
+MONK_TO_5CLASS = {
+    1: 0, 2: 0,              # Very Light (scales 1-2)
+    3: 1, 4: 1,              # Light (scales 3-4)
+    5: 2, 6: 2,              # Medium (scales 5-6)
+    7: 3, 8: 3,              # Dark (scales 7-8)
+    9: 4, 10: 4,             # Very Dark (scales 9-10)
 }
 
 
@@ -114,7 +135,7 @@ def calculate_ita(image_bgr: np.ndarray, mask: np.ndarray = None) -> float:
     return ita
 
 
-def ita_to_class(ita: float, thresholds: dict = None) -> int:
+def ita_to_class_3(ita: float, thresholds: dict = None) -> int:
     """
     Map ITA value to 3-class label.
 
@@ -126,7 +147,7 @@ def ita_to_class(ita: float, thresholds: dict = None) -> int:
         Class label: 0=Light, 1=Medium, 2=Dark
     """
     if thresholds is None:
-        thresholds = ITA_THRESHOLDS
+        thresholds = ITA_THRESHOLDS_3CLASS
 
     if ita > thresholds["light_min"]:
         return 0  # Light
@@ -134,6 +155,50 @@ def ita_to_class(ita: float, thresholds: dict = None) -> int:
         return 2  # Dark
     else:
         return 1  # Medium
+
+
+def ita_to_class_5(ita: float, thresholds: dict = None) -> int:
+    """
+    Map ITA value to 5-class label.
+
+    Args:
+        ita: ITA angle in degrees
+        thresholds: Dict with 'very_light_min', 'light_min', 'medium_min', 'dark_min' keys
+
+    Returns:
+        Class label: 0=Very Light, 1=Light, 2=Medium, 3=Dark, 4=Very Dark
+    """
+    if thresholds is None:
+        thresholds = ITA_THRESHOLDS_5CLASS
+
+    if ita > thresholds["very_light_min"]:
+        return 0  # Very Light
+    elif ita > thresholds["light_min"]:
+        return 1  # Light
+    elif ita > thresholds["medium_min"]:
+        return 2  # Medium
+    elif ita > thresholds["dark_min"]:
+        return 3  # Dark
+    else:
+        return 4  # Very Dark
+
+
+def ita_to_class(ita: float, thresholds: dict = None, num_classes: int = 3) -> int:
+    """
+    Map ITA value to class label.
+
+    Args:
+        ita: ITA angle in degrees
+        thresholds: Dict with threshold keys
+        num_classes: 3 or 5
+
+    Returns:
+        Class label
+    """
+    if num_classes == 5:
+        return ita_to_class_5(ita, thresholds)
+    else:
+        return ita_to_class_3(ita, thresholds)
 
 
 def process_single_image(
@@ -183,7 +248,7 @@ def process_single_image(
     }
 
 
-def load_dataset(data_dir: str, use_preprocessed: bool = False) -> list[tuple[Path, int, Path | None]]:
+def load_dataset(data_dir: str, use_preprocessed: bool = False, num_classes: int = 3) -> list[tuple[Path, int, Path | None]]:
     """
     Load dataset from directory structure.
 
@@ -207,12 +272,16 @@ def load_dataset(data_dir: str, use_preprocessed: bool = False) -> list[tuple[Pa
     Args:
         data_dir: Path to dataset directory
         use_preprocessed: If True, look for _masked.jpg and _mask.png files
+        num_classes: 3 or 5 class grouping
 
     Returns:
-        List of (image_path, 3-class label, mask_path or None) tuples
+        List of (image_path, class label, mask_path or None) tuples
     """
     data_path = Path(data_dir)
     samples = []
+
+    # Select mapping based on num_classes
+    monk_mapping = MONK_TO_5CLASS if num_classes == 5 else MONK_TO_3CLASS
 
     for scale in range(1, 11):
         scale_dir = data_path / f"scale_{scale}"
@@ -220,7 +289,7 @@ def load_dataset(data_dir: str, use_preprocessed: bool = False) -> list[tuple[Pa
             print(f"Warning: {scale_dir} does not exist")
             continue
 
-        label = MONK_TO_3CLASS[scale]
+        label = monk_mapping[scale]
 
         if use_preprocessed:
             # Look for _masked.jpg files and corresponding _mask.png
@@ -250,6 +319,7 @@ def evaluate_ita(
     use_skin_mask: bool = False,
     use_preprocessed: bool = False,
     num_workers: int = 1,
+    num_classes: int = 3,
 ) -> dict:
     """
     Evaluate ITA baseline on dataset.
@@ -262,15 +332,18 @@ def evaluate_ita(
         use_skin_mask: If True, apply skin segmentation on-the-fly before ITA calculation
         use_preprocessed: If True, use preprocessed _masked.jpg and _mask.png files
         num_workers: Number of parallel workers (default 1 = sequential)
+        num_classes: 3 or 5 class grouping
 
     Returns:
         Dictionary with evaluation metrics
     """
+    # Select defaults based on num_classes
     if thresholds is None:
-        thresholds = ITA_THRESHOLDS
+        thresholds = ITA_THRESHOLDS_5CLASS if num_classes == 5 else ITA_THRESHOLDS_3CLASS
+    class_names = CLASS_NAMES_5CLASS if num_classes == 5 else CLASS_NAMES_3CLASS
 
     # Load dataset
-    samples = load_dataset(data_dir, use_preprocessed=use_preprocessed)
+    samples = load_dataset(data_dir, use_preprocessed=use_preprocessed, num_classes=num_classes)
     if verbose:
         print(f"Loaded {len(samples)} images from {data_dir}")
         if use_preprocessed:
@@ -283,7 +356,7 @@ def evaluate_ita(
     if verbose:
         print(f"Class distribution: {dict(sorted(class_counts.items()))}")
         for cls_id, count in sorted(class_counts.items()):
-            print(f"  {CLASS_NAMES[cls_id]}: {count}")
+            print(f"  {class_names[cls_id]}: {count}")
 
     # Evaluate
     predictions = []
@@ -323,7 +396,7 @@ def evaluate_ita(
 
                 ita_values.append(result["ita"])
                 ground_truth.append(result["label"])
-                predictions.append(ita_to_class(result["ita"], thresholds))
+                predictions.append(ita_to_class(result["ita"], thresholds, num_classes))
 
                 if result["skin_ratio"] is not None:
                     skin_ratios.append(result["skin_ratio"])
@@ -362,7 +435,7 @@ def evaluate_ita(
             ita_values.append(ita)
 
             # Predict class
-            pred = ita_to_class(ita, thresholds)
+            pred = ita_to_class(ita, thresholds, num_classes)
             predictions.append(pred)
             ground_truth.append(label)
 
@@ -370,9 +443,6 @@ def evaluate_ita(
     predictions = np.array(predictions)
     ground_truth = np.array(ground_truth)
     ita_values = np.array(ita_values)
-
-    # Calculate metrics
-    num_classes = 3
 
     # Overall accuracy
     correct = (predictions == ground_truth).sum()
@@ -406,7 +476,7 @@ def evaluate_ita(
             recall = 0
             f1 = 0
 
-        per_class[CLASS_NAMES[cls_id]] = {
+        per_class[class_names[cls_id]] = {
             "accuracy": float(cls_accuracy),
             "precision": float(precision),
             "recall": float(recall),
@@ -420,13 +490,13 @@ def evaluate_ita(
         confusion[true, pred] += 1
 
     # Macro F1
-    macro_f1 = np.mean([per_class[name]["f1"] for name in CLASS_NAMES])
+    macro_f1 = np.mean([per_class[name]["f1"] for name in class_names])
 
     # Weighted F1
-    total_support = sum(per_class[name]["support"] for name in CLASS_NAMES)
+    total_support = sum(per_class[name]["support"] for name in class_names)
     weighted_f1 = sum(
         per_class[name]["f1"] * per_class[name]["support"] / total_support
-        for name in CLASS_NAMES
+        for name in class_names
     )
 
     # ITA statistics per class
@@ -435,7 +505,7 @@ def evaluate_ita(
         cls_mask = ground_truth == cls_id
         if cls_mask.sum() > 0:
             cls_ita = ita_values[cls_mask]
-            ita_stats[CLASS_NAMES[cls_id]] = {
+            ita_stats[class_names[cls_id]] = {
                 "mean": float(np.mean(cls_ita)),
                 "std": float(np.std(cls_ita)),
                 "min": float(np.min(cls_ita)),
@@ -493,37 +563,43 @@ def evaluate_ita(
             if skin_ratios:
                 print(f"  Mean skin ratio: {np.mean(skin_ratios):.1%}")
                 print(f"  Failed segmentations: {failed_segmentations}")
-        print(f"\nThresholds: Light > {thresholds['light_min']}°, "
-              f"Dark < {thresholds['dark_max']}°")
+        if num_classes == 3:
+            print(f"\nThresholds: Light > {thresholds['light_min']}°, "
+                  f"Dark < {thresholds['dark_max']}°")
+        else:
+            print(f"\nThresholds: VeryLight > {thresholds['very_light_min']}°, "
+                  f"Light > {thresholds['light_min']}°, "
+                  f"Medium > {thresholds['medium_min']}°, "
+                  f"Dark > {thresholds['dark_min']}°")
         print(f"\nOverall Accuracy: {accuracy:.1%}")
         print(f"Macro F1: {macro_f1:.3f}")
         print(f"Weighted F1: {weighted_f1:.3f}")
 
         print("\nPer-Class Performance:")
         print("-" * 60)
-        print(f"{'Class':<10} {'Precision':<12} {'Recall':<12} {'F1':<12} {'Support':<10}")
+        print(f"{'Class':<12} {'Precision':<12} {'Recall':<12} {'F1':<12} {'Support':<10}")
         print("-" * 60)
-        for name in CLASS_NAMES:
+        for name in class_names:
             m = per_class[name]
-            print(f"{name:<10} {m['precision']:.3f}        {m['recall']:.3f}        "
+            print(f"{name:<12} {m['precision']:.3f}        {m['recall']:.3f}        "
                   f"{m['f1']:.3f}        {m['support']:<10}")
 
         print("\nConfusion Matrix:")
-        print("-" * 40)
-        print(f"{'Pred →':<10}", end="")
-        for name in CLASS_NAMES:
-            print(f"{name:<10}", end="")
+        print("-" * (12 * num_classes + 12))
+        print(f"{'Pred →':<12}", end="")
+        for name in class_names:
+            print(f"{name:<12}", end="")
         print()
-        print("-" * 40)
-        for i, name in enumerate(CLASS_NAMES):
-            print(f"{name:<10}", end="")
+        print("-" * (12 * num_classes + 12))
+        for i, name in enumerate(class_names):
+            print(f"{name:<12}", end="")
             for j in range(num_classes):
-                print(f"{confusion[i, j]:<10}", end="")
+                print(f"{confusion[i, j]:<12}", end="")
             print()
 
         print("\nITA Statistics by Class:")
         print("-" * 60)
-        for name in CLASS_NAMES:
+        for name in class_names:
             if name in ita_stats:
                 s = ita_stats[name]
                 print(f"{name}: mean={s['mean']:.1f}°, std={s['std']:.1f}°, "
@@ -539,6 +615,117 @@ def evaluate_ita(
     return results
 
 
+def compute_empirical_thresholds(
+    data_dir: str,
+    use_preprocessed: bool = False,
+    use_skin_mask: bool = False,
+    num_workers: int = 1,
+    num_classes: int = 3,
+    verbose: bool = True,
+) -> dict:
+    """
+    Compute empirical ITA thresholds from data distribution.
+
+    Uses midpoints between class medians as decision boundaries.
+
+    Args:
+        data_dir: Path to dataset
+        use_preprocessed: Use preprocessed masks
+        use_skin_mask: Use on-the-fly skin segmentation
+        num_workers: Number of parallel workers
+        num_classes: 3 or 5 class grouping
+        verbose: Print progress
+
+    Returns:
+        Dict with thresholds and per-class statistics
+    """
+    samples = load_dataset(data_dir, use_preprocessed=use_preprocessed, num_classes=num_classes)
+    if verbose:
+        print(f"Computing empirical thresholds from {len(samples)} samples...")
+
+    # Compute ITA for all samples
+    ita_by_class = {i: [] for i in range(num_classes)}
+
+    if num_workers > 1:
+        process_fn = partial(
+            process_single_image,
+            use_preprocessed=use_preprocessed,
+            use_skin_mask=use_skin_mask,
+        )
+
+        with ProcessPoolExecutor(max_workers=num_workers) as executor:
+            futures = {executor.submit(process_fn, sample): sample for sample in samples}
+
+            for future in tqdm(as_completed(futures), total=len(samples), desc="Computing ITA", disable=not verbose):
+                result = future.result()
+                if result["success"]:
+                    ita_by_class[result["label"]].append(result["ita"])
+    else:
+        for img_path, label, mask_path in tqdm(samples, desc="Computing ITA", disable=not verbose):
+            image = cv2.imread(str(img_path))
+            if image is None:
+                continue
+
+            mask = None
+            if use_preprocessed and mask_path is not None:
+                mask = cv2.imread(str(mask_path), cv2.IMREAD_GRAYSCALE)
+            elif use_skin_mask:
+                mask = segment_skin(image, method="ycbcr", apply_morphology=True)
+
+            ita = calculate_ita(image, mask=mask)
+            ita_by_class[label].append(ita)
+
+    # Compute medians for each class
+    class_names = CLASS_NAMES_5CLASS if num_classes == 5 else CLASS_NAMES_3CLASS
+    medians = {}
+    for cls_id in range(num_classes):
+        if ita_by_class[cls_id]:
+            medians[cls_id] = np.median(ita_by_class[cls_id])
+        else:
+            medians[cls_id] = 0.0
+
+    if verbose:
+        print("\nPer-class ITA medians:")
+        for cls_id in range(num_classes):
+            print(f"  {class_names[cls_id]}: {medians[cls_id]:.1f}°")
+
+    # Compute thresholds as midpoints between adjacent class medians
+    # Classes should be ordered from lightest to darkest (0=lightest)
+    if num_classes == 5:
+        # Thresholds between: VeryLight/Light, Light/Medium, Medium/Dark, Dark/VeryDark
+        thresholds = {
+            "very_light_min": (medians[0] + medians[1]) / 2,
+            "light_min": (medians[1] + medians[2]) / 2,
+            "medium_min": (medians[2] + medians[3]) / 2,
+            "dark_min": (medians[3] + medians[4]) / 2,
+        }
+    else:
+        # Thresholds between: Light/Medium, Medium/Dark
+        thresholds = {
+            "light_min": (medians[0] + medians[1]) / 2,
+            "dark_max": (medians[1] + medians[2]) / 2,
+        }
+
+    if verbose:
+        print("\nEmpirical thresholds (midpoints between medians):")
+        for key, val in thresholds.items():
+            print(f"  {key}: {val:.1f}°")
+
+    return {
+        "thresholds": thresholds,
+        "medians": {class_names[k]: v for k, v in medians.items()},
+        "stats": {
+            class_names[k]: {
+                "median": float(np.median(v)),
+                "mean": float(np.mean(v)),
+                "std": float(np.std(v)),
+                "count": len(v),
+            }
+            for k, v in ita_by_class.items() if v
+        },
+    }
+
+
 def tune_thresholds(
     data_dir: str,
     light_range: tuple = (-30, 30, 5),
@@ -547,6 +734,7 @@ def tune_thresholds(
     use_preprocessed: bool = False,
     use_skin_mask: bool = False,
     num_workers: int = 1,
+    num_classes: int = 3,
 ) -> dict:
     """
     Grid search for optimal ITA thresholds.
@@ -559,11 +747,30 @@ def tune_thresholds(
         use_preprocessed: Use preprocessed masks
         use_skin_mask: Use on-the-fly skin segmentation
         num_workers: Number of parallel workers
+        num_classes: 3 or 5 class grouping
 
     Returns:
         Best thresholds and accuracy
     """
-    samples = load_dataset(data_dir, use_preprocessed=use_preprocessed)
+    # For 5-class, use empirical thresholds instead of grid search
+    if num_classes == 5:
+        if verbose:
+            print("Computing empirical thresholds for 5-class (grid search not practical)...")
+        empirical = compute_empirical_thresholds(
+            data_dir,
+            use_preprocessed=use_preprocessed,
+            use_skin_mask=use_skin_mask,
+            num_workers=num_workers,
+            num_classes=num_classes,
+            verbose=verbose,
+        )
+        return {
+            "best_thresholds": empirical["thresholds"],
+            "best_accuracy": None,
+            "empirical_stats": empirical["stats"],
+        }
+
+    samples = load_dataset(data_dir, use_preprocessed=use_preprocessed, num_classes=num_classes)
     print(f"Tuning thresholds on {len(samples)} samples...")
 
     # Pre-compute ITA values
@@ -709,14 +916,24 @@ def main():
         default="-50,0,5",
         help="Dark threshold range for tuning: start,stop,step (default: -50,0,5)",
     )
+    parser.add_argument(
+        "--num-classes",
+        type=int,
+        default=3,
+        choices=[3, 5],
+        help="Number of classes: 3 (Light/Medium/Dark) or 5 (Very Light/Light/Medium/Dark/Very Dark)",
+    )
 
     args = parser.parse_args()
 
-    # Set thresholds
-    thresholds = {
-        "light_min": args.light_threshold,
-        "dark_max": args.dark_threshold,
-    }
+    # Set default thresholds based on num_classes
+    if args.num_classes == 5:
+        thresholds = ITA_THRESHOLDS_5CLASS.copy()
+    else:
+        thresholds = {
+            "light_min": args.light_threshold,
+            "dark_max": args.dark_threshold,
+        }
 
     # Optional: tune thresholds on validation set
     if args.tune:
@@ -734,6 +951,7 @@ def main():
             use_preprocessed=args.use_preprocessed,
             use_skin_mask=args.use_skin_mask,
             num_workers=args.workers,
+            num_classes=args.num_classes,
         )
         thresholds = tune_results["best_thresholds"]
         print()
@@ -741,18 +959,21 @@ def main():
     # Determine output file name
     output_file = args.output
     if output_file == "training/results_ita_baseline.json":
+        suffix = f"_{args.num_classes}class" if args.num_classes == 5 else ""
         if args.use_preprocessed:
-            output_file = "training/results_ita_preprocessed.json"
+            output_file = f"training/results_ita_preprocessed{suffix}.json"
         elif args.use_skin_mask:
-            output_file = "training/results_ita_skin_segmented.json"
+            output_file = f"training/results_ita_skin_segmented{suffix}.json"
+        elif args.num_classes == 5:
+            output_file = "training/results_ita_baseline_5class.json"
 
     # Evaluate on test set
     if args.use_preprocessed:
-        method_desc = "ITA + preprocessed skin masks"
+        method_desc = f"ITA + preprocessed skin masks ({args.num_classes}-class)"
     elif args.use_skin_mask:
-        method_desc = "ITA + skin segmentation (on-the-fly)"
+        method_desc = f"ITA + skin segmentation ({args.num_classes}-class)"
     else:
-        method_desc = "ITA baseline"
+        method_desc = f"ITA baseline ({args.num_classes}-class)"
     print(f"Evaluating {method_desc} on: {args.data_dir}")
     results = evaluate_ita(
         args.data_dir,
@@ -761,6 +982,7 @@ def main():
         use_skin_mask=args.use_skin_mask,
         use_preprocessed=args.use_preprocessed,
         num_workers=args.workers,
+        num_classes=args.num_classes,
     )
 
 
