@@ -67,3 +67,17 @@ app/windows/flutter/generated_plugin_registrant.h
 app/windows/flutter/generated_plugins.cmake
 # MediaPipe model files (downloaded at runtime)
 *.task
+
+# Instructor-provided materials (from Teams)
+docs/project-materials/
+
+# LaTeX auxiliary files and generated PDF
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+docs/report/*.pdf
+
+# Presentation file
+docs/presentation/*.pptx

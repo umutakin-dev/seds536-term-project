@@ -17,9 +17,9 @@
 \floatstyle{plaintop}
 \restylefloat{table}
 \usepackage{natbib}
-\usepackage{hyperref}
+\usepackage[hidelinks]{hyperref}
 \usepackage{listings}
-\usepackage{xcolor}
+\usepackage[table]{xcolor}
 
 % Code listing style
 \lstset{
@@ -58,6 +58,11 @@
 	\item Umut Akin
 \end{itemize}
 
+\textbf{Source Code}
+\begin{itemize}
+	\item \url{https://github.com/umutakin-dev/seds536-term-project}
+\end{itemize}
+
 \cleardoublepage
 \pagenumbering{arabic}
 
@@ -65,13 +70,15 @@
 % ABSTRACT
 %==============================================================================
 \begin{abstract}
-This project addresses the challenge of inclusive skin tone detection for personalized skincare recommendations. We compare classical image processing techniques with deep learning approaches, evaluating their accuracy and fairness across diverse skin tones using the Monk Skin Tone Scale.
+This project addresses the challenge of inclusive skin tone detection for personalized skincare recommendations, applying a comprehensive set of image understanding techniques. We compare classical image processing with deep learning approaches, evaluating their accuracy and fairness across diverse skin tones using the Monk Skin Tone Scale.
 
-Our classical approach implements the Individual Typology Angle (ITA) method, incorporating color space conversion (RGB to YCbCr and LAB), skin segmentation via thresholding, and morphological operations (opening and closing) for mask refinement. We tested multiple segmentation methods including YCbCr color thresholding, face oval masking, and MediaPipe face landmarks.
+Our classical approach implements the Individual Typology Angle (ITA) method, demonstrating core image understanding techniques: color space conversion (RGB to YCbCr and LAB), skin segmentation via thresholding, morphological operations (opening and closing) for mask refinement, and face detection using both Haar Cascade classifiers and MediaPipe landmarks. We tested multiple segmentation methods including YCbCr color thresholding, face oval masking, and MediaPipe face landmarks.
+
+Critically, these image understanding techniques were applied not only during analysis but also during \textbf{data preprocessing}---face detection and cropping removed background clutter, while skin mask generation created clean input for both pipelines.
 
 For deep learning, we trained an EfficientNet-B0 model with transfer learning, optimized for on-device mobile inference to protect user privacy. The model was trained on Meta's Casual Conversations v2 dataset with 150,000+ images annotated using the 10-point Monk scale.
 
-Results show that the CNN approach (78.6\% accuracy) dramatically outperforms classical ITA (52.3\% best case). We discovered that ITA is fundamentally misaligned with the Monk scale due to a non-monotonic relationship between ITA values and perceptual skin tone categories. Key challenges include severe class imbalance (Scale 5 has 394$\times$ more samples than Scale 10) and a 42\% accuracy gap between best and worst performing classes.
+Results show that the CNN approach (78.6\% accuracy) dramatically outperforms classical ITA (52.3\% best case). We discovered that ITA is fundamentally unsuitable for fine-grained classification due to high variance under uncontrolled lighting---adjacent classes differ by only 3$\degree$ while standard deviations exceed 38$\degree$. Key challenges include severe class imbalance (Scale 5 has 394$\times$ more samples than Scale 10) and a 42\% accuracy gap between best and worst performing classes.
 
 The final model achieves on-device inference in under 2 seconds with a 15MB TFLite model, meeting privacy requirements while providing practical skin tone classification for mobile applications.
 \end{abstract}
@@ -118,6 +125,50 @@ This project focuses on:
     \item Evaluation using the Monk Skin Tone Scale \citep{monk2019skin}
     \item Mobile-optimized model deployment (TFLite)
 \end{itemize}
+
+%==============================================================================
+% IMAGE UNDERSTANDING TECHNIQUES OVERVIEW
+%==============================================================================
+\section{Image Understanding Techniques Overview}
+
+This project applies a comprehensive set of image understanding techniques from both classical and deep learning paradigms. Importantly, these techniques were applied at \textbf{two distinct stages}: (1) dataset preprocessing to clean and enhance raw video frames, and (2) skin tone analysis for classification. Table \ref{tab:techniques-overview} summarizes all techniques and their application stages.
+
+\begin{table}[H]
+\centering
+\caption{Summary of Image Understanding Techniques Applied}
+\label{tab:techniques-overview}
+\begin{tabular}{p{2.8cm}p{3.5cm}p{4.2cm}p{2cm}}
+\toprule
+\textbf{Category} & \textbf{Technique} & \textbf{Application} & \textbf{Stage} \\
+\midrule
+\multirow{2}{2.8cm}{Face Detection}
+    & Haar Cascade Classifier & Crop face region from raw frames & Preprocess \\
+    & MediaPipe Face Landmarker & Extract precise face boundaries & Preprocess \\
+\midrule
+\multirow{2}{2.8cm}{Segmentation}
+    & Face Region Cropping & Remove background, isolate face & Preprocess \\
+    & Color Thresholding & Create skin-only binary masks & Both \\
+\midrule
+\multirow{2}{2.8cm}{Color Space Conversion}
+    & RGB $\rightarrow$ YCbCr & Skin pixel detection via Cb/Cr & Analysis \\
+    & RGB $\rightarrow$ CIE LAB & ITA calculation (L*, b* channels) & Analysis \\
+\midrule
+\multirow{2}{2.8cm}{Morphological Ops}
+    & Opening (Erode+Dilate) & Remove noise from skin masks & Both \\
+    & Closing (Dilate+Erode) & Fill holes in skin masks & Both \\
+\midrule
+\multirow{3}{2.8cm}{Deep Learning}
+    & Transfer Learning & Leverage ImageNet features & Analysis \\
+    & CNN (EfficientNet-B0) & Skin tone classification & Analysis \\
+    & Data Augmentation & Improve robustness & Analysis \\
+\midrule
+Classical Formula
+    & Individual Typology Angle & Colorimetric measurement & Analysis \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+This two-stage pipeline ensures that both classical and deep learning models receive clean, face-focused input images rather than raw video frames with cluttered backgrounds. The following sections provide theoretical background (Section 3) and detailed implementation of each technique (Section 4).
 
 %==============================================================================
 % LITERATURE REVIEW
@@ -176,6 +227,8 @@ Key fairness metrics include:
 %==============================================================================
 \section{Methodology}
 
+This section details the implementation of image understanding techniques summarized in Table \ref{tab:techniques-overview}. We first describe the data preprocessing pipeline (Section 4.2) where face detection, cropping, and mask generation were applied to clean and enhance the raw dataset. We then present two parallel analysis approaches: a classical image processing pipeline (Section 4.3) demonstrating color space conversion, thresholding, and morphological operations; and a deep learning approach (Section 4.4) leveraging transfer learning and convolutional neural networks. Both approaches were evaluated on the preprocessed dataset variants to enable direct comparison.
+
 \subsection{Dataset}
 
 We use the Casual Conversations v2 (CCv2) dataset \citep{porgali2023casual} from Meta AI Research. This dataset contains video frames with Monk Skin Tone scale annotations (1-10).
@@ -195,6 +248,48 @@ Test & 22,730 & Final evaluation \\
 \end{table}
 
 The dataset exhibits severe class imbalance: Scale 5 (Medium) contains 45\% of all samples, while Scale 10 (Darkest) contains only 0.1\%. This 394$\times$ imbalance presents a significant challenge for fair classification.
+
+\subsection{Data Preprocessing Pipeline}
+
+Raw video frames from CCv2 contain full scenes with varied backgrounds, multiple subjects, and inconsistent framing. Before applying analysis techniques, we preprocessed the dataset using image understanding methods to create clean, face-focused images.
+
+\subsubsection{Face Detection and Cropping}
+We applied face detection to extract face regions from raw frames:
+\begin{itemize}
+    \item \textbf{Haar Cascade Detection}: Used OpenCV's pre-trained frontal face classifier to detect face bounding boxes. Detected regions were cropped with padding to ensure the full face was captured.
+    \item \textbf{MediaPipe Face Landmarker}: For higher-precision preprocessing, we used MediaPipe to detect 478 facial landmarks and extract tight face boundaries.
+\end{itemize}
+
+This step removed background clutter and ensured consistent input for both classical and deep learning pipelines.
+
+\subsubsection{Skin Mask Generation for Dataset Enhancement}
+For experiments requiring skin-only analysis, we generated binary skin masks:
+\begin{enumerate}
+    \item Convert cropped face images from RGB to YCbCr color space
+    \item Apply color thresholding (Cb: 77-127, Cr: 133-173) to identify skin pixels
+    \item Apply morphological opening (5$\times$5 elliptical kernel) to remove noise
+    \item Apply morphological closing to fill small holes in the mask
+    \item Store both the cropped images and corresponding masks
+\end{enumerate}
+
+\subsubsection{Preprocessed Dataset Variants}
+The preprocessing pipeline produced multiple dataset variants for experimentation:
+\begin{table}[H]
+\centering
+\caption{Preprocessed Dataset Variants}
+\begin{tabular}{llc}
+\toprule
+\textbf{Variant} & \textbf{Preprocessing Applied} & \textbf{Used In} \\
+\midrule
+Raw frames & None & Exp 1 (baseline) \\
+Haar face crops & Face detection + crop & Exp 2, 3 \\
+MediaPipe crops & Landmark-based crop & Exp 4, 5 \\
+MediaPipe + masks & Crop + skin segmentation & Exp 3e, 4 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+This preprocessing approach demonstrates that image understanding techniques are valuable not only for final analysis but also for dataset preparation---enabling fair comparison between methods by providing consistent, clean input data.
 
 \subsection{Classical Approach: ITA with Skin Segmentation}
 
@@ -380,20 +475,20 @@ Testing 5-class ITA revealed a critical finding:
 \begin{table}[H]
 \centering
 \caption{ITA Medians by Monk Class (5-class)}
-\begin{tabular}{lcc}
+\begin{tabular}{lccc}
 \toprule
-\textbf{Class} & \textbf{Median ITA} & \textbf{Expected Order} \\
+\textbf{Class} & \textbf{Median ITA} & \textbf{Std Dev} & \textbf{Gap to Next} \\
 \midrule
-Very Light & 27.4$\degree$ & Highest \\
-Light & 12.5$\degree$ & $\downarrow$ \\
-Medium & -3.4$\degree$ & $\downarrow$ \\
-\textbf{Dark} & \textbf{-6.3$\degree$} & \textbf{Should be lower!} \\
-Very Dark & -61.7$\degree$ & Lowest \\
+Very Light & 25.8$\degree$ & 37.0$\degree$ & 15.1$\degree$ \\
+Light & 10.7$\degree$ & 37.7$\degree$ & 9.6$\degree$ \\
+Medium & 1.0$\degree$ & 39.4$\degree$ & \textbf{3.1$\degree$} \\
+Dark & -2.1$\degree$ & 38.9$\degree$ & 66.4$\degree$ \\
+Very Dark & -68.5$\degree$ & 45.7$\degree$ & -- \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\textbf{Critical Discovery}: The Dark class has a \textit{higher} median ITA than Medium (-6.3$\degree$ vs -3.4$\degree$). This non-monotonic relationship means ITA-based threshold classification is fundamentally incompatible with the Monk scale.
+\textbf{Critical Discovery}: While ITA medians follow the expected order, the Medium and Dark classes are only \textbf{3.1$\degree$ apart}---yet both have standard deviations exceeding \textbf{38$\degree$}. This massive overlap (distributions span $\sim$180$\degree$ each) makes threshold-based separation between adjacent classes impossible. ITA's high variance under uncontrolled lighting renders it ineffective for fine-grained skin tone classification.
 
 \subsection{Key Results Summary}
 
@@ -448,7 +543,7 @@ The CNN achieves 78.6\% accuracy compared to ITA's 52.3\% ceiling because:
 
     \item \textbf{Lighting Invariance}: CNNs learn robust features through augmentation, while ITA is sensitive to lighting variation.
 
-    \item \textbf{Non-Monotonic Relationship}: We discovered that ITA values do not monotonically decrease with darker Monk classes, making threshold-based classification impossible.
+    \item \textbf{High Variance}: ITA values have standard deviations exceeding 38$\degree$ per class, causing massive overlap between adjacent classes. The 3$\degree$ gap between Medium and Dark medians is dwarfed by their $\sim$39$\degree$ standard deviations, making threshold-based classification unreliable.
 \end{enumerate}
 
 \subsection{Preprocessing: Simpler is Better}
@@ -457,7 +552,6 @@ Surprisingly, simpler Haar face crops (78.6\%) outperformed sophisticated MediaP
 \begin{itemize}
     \item CNNs naturally learn to focus on relevant regions
     \item MediaPipe had 12\% detection failures, reducing training data
-    \item Context (hair, background) may provide useful features
 \end{itemize}
 
 \subsection{Limitations}
@@ -476,20 +570,24 @@ Surprisingly, simpler Haar face crops (78.6\%) outperformed sophisticated MediaP
 
 This project demonstrated both classical and deep learning approaches to skin tone classification, achieving the primary goal of on-device inference for privacy-preserving mobile applications.
 
+\vspace{1em}
 \textbf{Key Contributions}:
 \begin{enumerate}
+    \item Application of image understanding techniques at multiple stages: data preprocessing (face detection, cropping, mask generation) and analysis (segmentation, classification)
     \item Systematic comparison of ITA (classical) vs CNN (deep learning) approaches
-    \item Discovery that ITA is fundamentally misaligned with the Monk scale
+    \item Discovery that ITA's high variance makes it unsuitable for fine-grained classification
     \item Mobile-optimized model achieving 78.6\% accuracy in 15MB
     \item Comprehensive fairness analysis across skin tone categories
 \end{enumerate}
 
-\textbf{Course Concepts Demonstrated}:
+\textbf{Image Understanding Techniques Demonstrated}:
 \begin{itemize}
-    \item Color space conversion (RGB $\rightarrow$ YCbCr, RGB $\rightarrow$ LAB)
-    \item Thresholding for skin segmentation
-    \item Morphological operations (erosion, dilation, opening, closing)
-    \item Transfer learning with CNNs
+    \item \textbf{Face Detection} (Preprocessing): Haar Cascade and MediaPipe for face region extraction from raw video frames
+    \item \textbf{Segmentation} (Preprocessing + Analysis): Face cropping for dataset cleanup; color thresholding for skin pixel isolation
+    \item \textbf{Color Space Conversion} (Analysis): RGB $\rightarrow$ YCbCr for skin detection, RGB $\rightarrow$ LAB for ITA calculation
+    \item \textbf{Morphological Operations} (Both): Opening/closing for mask refinement in preprocessing and analysis
+    \item \textbf{Deep Learning} (Analysis): Transfer learning with EfficientNet-B0, data augmentation for robustness
+    \item \textbf{Classical Feature Extraction} (Analysis): Individual Typology Angle (ITA) formula for colorimetric measurement
 \end{itemize}
 
 \textbf{Future Work}:
@@ -525,7 +623,7 @@ Experiments & & & & \cellcolor{green!30}X & \cellcolor{green!30}X & \\
 \hline
 Model Conversion & & & & & \cellcolor{green!30}X & \\
 \hline
-Report \& Presentation & & & & & & \cellcolor{yellow!30}X \\
+Report \& Presentation & & & & & & \cellcolor{green!30}X \\
 \hline
 \end{tabular}
 \end{table}
