@@ -2,84 +2,84 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image/image.dart' as img;
-import '../services/skin_tone_classifier_service.dart';
+import '../models/analysis_history.dart';
 import '../services/history_service.dart';
 import '../widgets/recommendations_sheet.dart';
 
-class ResultsScreen extends StatefulWidget {
-  final String imagePath;
+class HistoryDetailScreen extends StatefulWidget {
+  final int historyId;
 
-  const ResultsScreen({
+  const HistoryDetailScreen({
     super.key,
-    required this.imagePath,
+    required this.historyId,
   });
 
   @override
-  State<ResultsScreen> createState() => _ResultsScreenState();
+  State<HistoryDetailScreen> createState() => _HistoryDetailScreenState();
 }
 
-class _ResultsScreenState extends State<ResultsScreen> {
-  final SkinToneClassifierService _classifier = SkinToneClassifierService();
+class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
   final HistoryService _historyService = HistoryService();
-  ClassificationResult? _result;
+  AnalysisHistory? _entry;
   bool _isLoading = true;
   String? _errorMessage;
-  bool _savedToHistory = false;
 
   @override
   void initState() {
     super.initState();
-    _runClassification();
+    _loadEntry();
   }
 
-  Future<void> _runClassification() async {
+  Future<void> _loadEntry() async {
     try {
-      // Load model
-      await _classifier.loadModel();
-
-      // Run classification
-      final result = await _classifier.classifyImage(widget.imagePath);
-
+      final entry = await _historyService.getHistoryById(widget.historyId);
       if (mounted) {
         setState(() {
-          _result = result;
+          _entry = entry;
           _isLoading = false;
-          if (result == null) {
-            _errorMessage = 'Classification failed. Please try again.';
+          if (entry == null) {
+            _errorMessage = 'Analysis not found';
           }
         });
-
-        // Save to history if classification succeeded
-        if (result != null && !_savedToHistory) {
-          _saveToHistory(result);
-        }
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMessage = 'Error: $e';
+          _errorMessage = 'Error loading analysis: $e';
         });
       }
     }
   }
 
-  Future<void> _saveToHistory(ClassificationResult result) async {
-    try {
-      await _historyService.saveAnalysis(
-        tempImagePath: widget.imagePath,
-        result: result,
-      );
-      _savedToHistory = true;
-    } catch (e) {
-      debugPrint('Failed to save to history: $e');
-    }
-  }
+  Future<void> _deleteEntry() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Analysis'),
+        content: const Text('Are you sure you want to delete this analysis?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
 
-  @override
-  void dispose() {
-    _classifier.dispose();
-    super.dispose();
+    if (confirmed == true && mounted) {
+      await _historyService.deleteHistory(widget.historyId);
+      if (mounted) {
+        context.go('/history');
+      }
+    }
   }
 
   @override
@@ -106,11 +106,11 @@ class _ResultsScreenState extends State<ResultsScreen> {
                   children: [
                     IconButton(
                       icon: const Icon(Icons.arrow_back, color: Colors.white),
-                      onPressed: () => context.go('/'),
+                      onPressed: () => context.go('/history'),
                     ),
                     const Expanded(
                       child: Text(
-                        'Analysis Results',
+                        'Analysis Details',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 20,
@@ -119,55 +119,24 @@ class _ResultsScreenState extends State<ResultsScreen> {
                         textAlign: TextAlign.center,
                       ),
                     ),
-                    const SizedBox(width: 48), // Balance the back button
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, color: Colors.white),
+                      onPressed: _entry != null ? _deleteEntry : null,
+                    ),
                   ],
                 ),
               ),
-              // Content - fixed layout, no scrolling
+              // Content
               Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // Extracted Face Image - expands to fill available space
-                      Expanded(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(24),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.2),
-                                blurRadius: 20,
-                                offset: const Offset(0, 10),
-                              ),
-                            ],
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(24),
-                            child:
-                                _FaceImageWithBackground(imagePath: widget.imagePath),
-                          ),
+                child: _isLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          color: Color(0xFFBD93F9),
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                      // Analysis Results - fits content only
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.95),
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        child: _isLoading
-                            ? _buildLoadingState()
-                            : _errorMessage != null
-                                ? _buildErrorState()
-                                : _buildResultsState(),
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-                  ),
-                ),
+                      )
+                    : _errorMessage != null
+                        ? _buildErrorState()
+                        : _buildContent(),
               ),
             ],
           ),
@@ -176,70 +145,91 @@ class _ResultsScreenState extends State<ResultsScreen> {
     );
   }
 
-  Widget _buildLoadingState() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: const [
-        SizedBox(height: 40),
-        CircularProgressIndicator(
-          color: Color(0xFFBD93F9),
-        ),
-        SizedBox(height: 24),
-        Text(
-          'Analyzing skin tone...',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        SizedBox(height: 8),
-        Text(
-          'This may take a moment',
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey,
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildErrorState() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const SizedBox(height: 40),
-        const Icon(
-          Icons.error_outline,
-          size: 64,
-          color: Colors.red,
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.error_outline,
+              size: 64,
+              color: Colors.red,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _errorMessage!,
+              style: const TextStyle(
+                fontSize: 16,
+                color: Colors.white,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () => context.go('/history'),
+              child: const Text('Back to History'),
+            ),
+          ],
         ),
-        const SizedBox(height: 16),
-        Text(
-          _errorMessage!,
-          style: const TextStyle(
-            fontSize: 16,
-            color: Colors.red,
-          ),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 24),
-        ElevatedButton(
-          onPressed: () {
-            setState(() {
-              _isLoading = true;
-              _errorMessage = null;
-            });
-            _runClassification();
-          },
-          child: const Text('Retry'),
-        ),
-      ],
+      ),
     );
   }
 
-  Widget _buildResultsState() {
-    final result = _result!;
+  Widget _buildContent() {
+    final entry = _entry!;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Date header
+          Text(
+            _formatFullDate(entry.timestamp),
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.7),
+              fontSize: 14,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          // Face Image
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.2),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: _FaceImageWithBackground(imagePath: entry.imagePath),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Analysis Results
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.95),
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: _buildResultsState(entry),
+          ),
+          const SizedBox(height: 12),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildResultsState(AnalysisHistory entry) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -262,7 +252,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
             ),
             const Spacer(),
             Text(
-              '${result.inferenceTimeMs}ms',
+              '${entry.inferenceTimeMs}ms',
               style: const TextStyle(
                 fontSize: 11,
                 color: Colors.grey,
@@ -277,7 +267,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
             Expanded(
               child: _CompactMetric(
                 label: 'Skin Tone',
-                value: result.className,
+                value: entry.skinToneClass,
                 icon: Icons.palette_outlined,
               ),
             ),
@@ -285,7 +275,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
             Expanded(
               child: _CompactMetric(
                 label: 'Monk Scale',
-                value: result.monkScaleRange,
+                value: entry.monkScaleRange,
                 icon: Icons.colorize_outlined,
               ),
             ),
@@ -293,7 +283,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
             Expanded(
               child: _CompactMetric(
                 label: 'Confidence',
-                value: '${(result.confidence * 100).toStringAsFixed(0)}%',
+                value: '${(entry.confidence * 100).toStringAsFixed(0)}%',
                 icon: Icons.insights_outlined,
               ),
             ),
@@ -310,13 +300,13 @@ class _ResultsScreenState extends State<ResultsScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        ...result.allProbabilities.entries.map((entry) {
+        ...entry.allProbabilities.entries.map((e) {
           return Padding(
             padding: const EdgeInsets.only(bottom: 4),
             child: _ProbabilityBar(
-              label: entry.key,
-              probability: entry.value,
-              isSelected: entry.key == result.className,
+              label: e.key,
+              probability: e.value,
+              isSelected: e.key == entry.skinToneClass,
             ),
           );
         }),
@@ -326,7 +316,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
           width: double.infinity,
           child: ElevatedButton.icon(
             onPressed: () {
-              RecommendationsSheet.show(context, result.className);
+              RecommendationsSheet.show(context, entry.skinToneClass);
             },
             icon: const Icon(Icons.spa_outlined, size: 18),
             label: const Text('View Skincare Tips'),
@@ -344,6 +334,16 @@ class _ResultsScreenState extends State<ResultsScreen> {
     );
   }
 
+  String _formatFullDate(DateTime date) {
+    final months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    final hour = date.hour > 12 ? date.hour - 12 : (date.hour == 0 ? 12 : date.hour);
+    final ampm = date.hour >= 12 ? 'PM' : 'AM';
+    final minute = date.minute.toString().padLeft(2, '0');
+    return '${months[date.month - 1]} ${date.day}, ${date.year} at $hour:$minute $ampm';
+  }
 }
 
 class _CompactMetric extends StatelessWidget {
@@ -464,7 +464,6 @@ class _ProbabilityBar extends StatelessWidget {
   }
 }
 
-/// Widget that displays face image centered with dominant color as background
 class _FaceImageWithBackground extends StatefulWidget {
   final String imagePath;
 
@@ -487,16 +486,23 @@ class _FaceImageWithBackgroundState extends State<_FaceImageWithBackground> {
   Future<void> _calculateDominantColor() async {
     try {
       final file = File(widget.imagePath);
+      if (!await file.exists()) {
+        if (mounted) {
+          setState(() {
+            _dominantColor = const Color(0xFF44475A);
+          });
+        }
+        return;
+      }
+
       final bytes = await file.readAsBytes();
       final image = img.decodeImage(bytes);
 
       if (image == null) return;
 
-      // Sample pixels from the image to find median color
       int totalR = 0, totalG = 0, totalB = 0;
       int sampleCount = 0;
 
-      // Sample every 10th pixel for performance
       for (int y = 0; y < image.height; y += 10) {
         for (int x = 0; x < image.width; x += 10) {
           final pixel = image.getPixel(x, y);
@@ -518,7 +524,6 @@ class _FaceImageWithBackgroundState extends State<_FaceImageWithBackground> {
         });
       }
     } catch (e) {
-      // Fallback to dark color if calculation fails
       if (mounted) {
         setState(() {
           _dominantColor = const Color(0xFF44475A);
@@ -529,14 +534,26 @@ class _FaceImageWithBackgroundState extends State<_FaceImageWithBackground> {
 
   @override
   Widget build(BuildContext context) {
+    final file = File(widget.imagePath);
     return Container(
       color: _dominantColor ?? const Color(0xFF44475A),
       child: Center(
-        child: Image.file(
-          File(widget.imagePath),
-          fit: BoxFit.contain,
-        ),
+        child: file.existsSync()
+            ? Image.file(
+                file,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) => _buildPlaceholder(),
+              )
+            : _buildPlaceholder(),
       ),
+    );
+  }
+
+  Widget _buildPlaceholder() {
+    return Icon(
+      Icons.image_not_supported,
+      size: 64,
+      color: Colors.white.withValues(alpha: 0.5),
     );
   }
 }
